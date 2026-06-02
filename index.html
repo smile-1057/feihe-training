@@ -1911,17 +1911,6 @@ async function pushReminder() {
     showToast("推送失败：" + e.message, "error");
   }
 }
-        pushToWebhook(targetUrl, { msg_type: "text", content: { text: msg } });
-        totalSent++;
-      }
-    }
-
-    showToast("推送完成：已发送 " + totalSent + " 条通知", totalSent > 0 ? "success" : "warning");
-  } catch(e) {
-    showLoading(false);
-    showToast("推送失败：" + e.message, "error");
-  }
-}
 
 // ==================== 导出 CSV ====================
 async function exportCSV() {
