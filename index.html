@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新人培训跟踪系统 - 飞鹤克东工厂 制粉部门</title>
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  window.supabase = { createClient };
+  window.dispatchEvent(new Event('supabaseReady'));
+</script>
+<style>
+  :root {
+    --primary: #1a73e8; --primary-dark: #1557b0;
+    --danger: #d93025; --warning: #f9ab00;
+    --success: #188038; --bg: #f8f9fa;
+    --card-bg: #ffffff; --border: #dadce0;
+    --text: #202124; --text-secondary: #5f6368;
+    --shadow: 0 2px 8px rgba(0,0,0,.08); --radius: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; min-height:100vh; }
+
+  /* ===== Login Page ===== */
+  #loginPage { display:flex; min-height:100vh; align-items:center; justify-content:center; background:linear-gradient(135deg,#1a3a5c 0%,#2a6496 50%,#1a3a5c 100%); }
+  .login-card { background:#fff; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,.25); padding:48px 40px; width:420px; text-align:center; }
+  .login-logo { font-size:64px; margin-bottom:12px; }
+  .login-title { font-size:22px; font-weight:700; color:var(--text); margin-bottom:4px; }
+  .login-subtitle { font-size:13px; color:var(--text-secondary); margin-bottom:32px; }
+  .login-form-group { text-align:left; margin-bottom:18px; }
+  .login-form-group label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; }
+  .login-form-group input,.login-form-group select { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-family:inherit; transition:border-color .2s; }
+  .login-form-group input:focus,.login-form-group select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,115,232,.12); }
+  .login-btn { width:100%; padding:13px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-size:16px; font-weight:600; cursor:pointer; transition:background .2s; margin-top:8px; font-family:inherit; }
+  .login-btn:hover { background:var(--primary-dark); }
+  .login-btn.register-btn { background:var(--success); }
+  .login-btn.register-btn:hover { background:#14692e; }
+  .login-error { background:#fce8e6; color:var(--danger); padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; display:none; }
+  .login-success { background:#e6f4ea; color:var(--success); padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; display:none; }
+  .login-hint { font-size:11px; color:#999; margin-top:24px; line-height:1.8; }
+  .login-hint code { background:#f1f3f4; padding:1px 6px; border-radius:3px; font-size:11px; }
+  .login-switch { font-size:13px; color:var(--text-secondary); margin-top:16px; }
+  .login-switch a { color:var(--primary); cursor:pointer; font-weight:600; text-decoration:underline; }
+
+  /* ===== Setup Page ===== */
+  #setupPage { display:flex; min-height:100vh; align-items:center; justify-content:center; background:linear-gradient(135deg,#1a3a5c 0%,#2a6496 50%,#1a3a5c 100%); }
+  .setup-card { background:#fff; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,.25); padding:40px; width:520px; text-align:center; }
+  .setup-card h2 { font-size:20px; margin-bottom:8px; }
+  .setup-card .desc { font-size:13px; color:var(--text-secondary); margin-bottom:24px; }
+  .setup-card .form-group { margin-bottom:14px; text-align:left; }
+  .setup-card .form-group label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; }
+  .setup-card .form-group input { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:14px; font-family:inherit; }
+  .setup-card .form-group input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,115,232,.12); }
+  .setup-step { font-size:12px; color:#999; margin-top:12px; line-height:1.8; }
+  .setup-step a { color:var(--primary); }
+
+  /* ===== App Page ===== */
+  #appPage { display:none; }
+
+  /* Header */
+  .header { background:linear-gradient(135deg,#1a3a5c 0%,#2a6496 100%); color:#fff; padding:16px 32px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 12px rgba(0,0,0,.12); position:sticky; top:0; z-index:100; }
+  .header-left { display:flex; align-items:center; gap:16px; }
+  .header-icon { font-size:28px; }
+  .header h1 { font-size:20px; font-weight:600; }
+  .header .subtitle { font-size:12px; opacity:.7; margin-top:1px; }
+  .header-right { display:flex; align-items:center; gap:12px; }
+  .user-badge { background:rgba(255,255,255,.15); padding:6px 14px; border-radius:20px; font-size:13px; display:flex; align-items:center; gap:6px; }
+  .badge-role { font-size:10px; background:rgba(255,255,255,.25); padding:1px 8px; border-radius:8px; }
+  .btn-logout { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; transition:background .2s; font-family:inherit; }
+  .btn-logout:hover { background:rgba(255,255,255,.25); }
+
+  /* Layout */
+  .container { max-width:1400px; margin:0 auto; padding:24px; }
+  .grid-2 { display:grid; grid-template-columns:420px 1fr; gap:24px; }
+
+  /* Cards */
+  .card { background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; margin-bottom:20px; }
+  .card-title { font-size:16px; font-weight:600; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--primary); display:flex; align-items:center; gap:8px; }
+  .card-title .icon { font-size:20px; }
+
+  /* Form */
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:5px; }
+  .form-group input,.form-group select { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:14px; font-family:inherit; transition:border-color .2s; background:#fff; }
+  .form-group input:focus,.form-group select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,115,232,.12); }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  /* Buttons */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 20px; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; font-family:inherit; }
+  .btn-primary { background:var(--primary); color:#fff; width:100%; padding:12px; font-size:15px; }
+  .btn-primary:hover { background:var(--primary-dark); }
+  .btn-outline { background:#fff; color:var(--primary); border:1.5px solid var(--primary); }
+  .btn-outline:hover { background:#e8f0fe; }
+  .btn-danger { background:#fff; color:var(--danger); border:1.5px solid var(--danger); }
+  .btn-danger:hover { background:#fce8e6; }
+  .btn-sm { padding:6px 14px; font-size:13px; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-bar { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+
+  /* Trainee List */
+  .trainee-list { margin-bottom:16px; }
+  .trainee-item { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:all .15s; }
+  .trainee-item:hover { border-color:var(--primary); background:#f8fbff; }
+  .trainee-item.active { border-color:var(--primary); background:#e8f0fe; }
+  .trainee-info .name { font-weight:600; font-size:14px; }
+  .trainee-info .meta { font-size:12px; color:var(--text-secondary); }
+  .trainee-status { text-align:right; }
+  .trainee-status .days { font-size:12px; color:var(--text-secondary); }
+
+  /* Badges */
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .badge-green { background:#e6f4ea; color:#137333; }
+  .badge-yellow { background:#fef7e0; color:#b06000; }
+  .badge-red { background:#fce8e6; color:#c5221f; }
+
+  /* Progress bar */
+  .progress-bar { height:6px; background:#e8eaed; border-radius:3px; margin-top:4px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:3px; transition:width .4s ease; }
+  .progress-green { background:var(--success); }
+  .progress-yellow { background:var(--warning); }
+  .progress-red { background:var(--danger); }
+
+  /* Table */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th { background:#f1f3f4; padding:10px 12px; text-align:left; font-weight:600; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; z-index:1; }
+  tbody td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tbody tr:hover { background:#f8fbff; }
+  tbody tr.status-overdue { background:#fef3f2; }
+  tbody tr.status-due-soon { background:#fffcf0; }
+  .status-dot { display:inline-flex; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+  .status-dot.overdue { background:var(--danger); }
+  .status-dot.due-soon { background:var(--warning); }
+  .status-dot.on-track { background:var(--success); }
+
+  /* Summary */
+  .summary-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+  .summary-card { background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px; text-align:center; }
+  .summary-card .num { font-size:36px; font-weight:700; line-height:1.2; }
+  .summary-card .label { font-size:13px; color:var(--text-secondary); margin-top:4px; }
+  .num.blue { color:var(--primary); } .num.green { color:var(--success); } .num.orange { color:#e37400; } .num.red { color:var(--danger); }
+
+  /* Reminder panel */
+  .reminder-panel { background:#fffcf0; border:1px solid #f9ab00; border-radius:var(--radius); padding:16px 20px; margin-top:16px; }
+  .reminder-panel h3 { font-size:14px; color:#b06000; margin-bottom:10px; }
+  .reminder-item { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; border-bottom:1px dashed #f9ab00; }
+  .reminder-item:last-child { border-bottom:none; }
+
+  /* Empty state */
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-secondary); }
+  .empty-state .icon { font-size:48px; margin-bottom:12px; }
+
+  /* Toast */
+  .toast { position:fixed; top:20px; right:20px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; font-weight:500; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,.15); animation:slideIn .3s ease; }
+  .toast-success { background:var(--success); } .toast-warning { background:#e37400; } .toast-error { background:var(--danger); }
+  @keyframes slideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  /* Modal */
+  .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; animation:fadeIn .2s ease; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  .modal { background:#fff; border-radius:14px; width:560px; max-height:85vh; overflow-y:auto; box-shadow:0 16px 50px rgba(0,0,0,.25); animation:slideUp .3s ease; }
+  @keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--border); }
+  .modal-header h3 { font-size:17px; font-weight:600; }
+  .modal-close { width:32px; height:32px; border-radius:50%; border:none; background:#f1f3f4; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; }
+  .modal-close:hover { background:#e8eaed; }
+  .modal-body { padding:20px 24px; }
+  .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
+
+  /* Upload */
+  .upload-area { border:2px dashed var(--border); border-radius:10px; padding:32px 20px; text-align:center; cursor:pointer; transition:all .2s; }
+  .upload-area:hover,.upload-area.dragover { border-color:var(--primary); background:#f8fbff; }
+  .upload-area .icon { font-size:36px; margin-bottom:8px; }
+  .upload-area .text { font-size:14px; color:var(--text-secondary); }
+  .upload-area .hint { font-size:11px; color:#999; margin-top:4px; }
+  .file-list { margin-top:12px; }
+  .file-item { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#f8f9fa; border-radius:6px; margin-bottom:6px; font-size:13px; }
+  .file-item .file-info { display:flex; align-items:center; gap:6px; }
+  .file-item .file-remove { background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:2px 6px; border-radius:4px; }
+  .file-item .file-remove:hover { background:#fce8e6; }
+
+  /* Attachment preview */
+  .attachment-preview { display:flex; flex-wrap:wrap; gap:4px; }
+  .attachment-thumb { width:40px; height:40px; border-radius:4px; border:1px solid var(--border); object-fit:cover; cursor:pointer; transition:transform .2s; }
+  .attachment-thumb:hover { transform:scale(1.8); z-index:10; position:relative; }
+  .attachment-link { font-size:11px; color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:2px; }
+  .attachment-link:hover { text-decoration:underline; }
+
+  /* Lightbox */
+  .lightbox-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; z-index:2000; cursor:pointer; }
+  .lightbox-overlay img { max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,.4); }
+
+  /* Loading overlay */
+  .loading-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,.7); display:flex; align-items:center; justify-content:center; z-index:9998; }
+  .loading-spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* Online indicator */
+  .online-dot { width:8px; height:8px; border-radius:50%; background:var(--success); display:inline-block; margin-right:4px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  @media print { .header,.left-panel,.btn-bar,.summary-row{display:none!important} .grid-2{display:block!important} .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid} body{background:#fff} }
+  @media(max-width:1000px){ .grid-2{grid-template-columns:1fr} .summary-row{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:600px){ .form-row{grid-template-columns:1fr} .summary-row{grid-template-columns:1fr 1fr} }
+
+  /* Status Tabs */
+  .status-tabs { display:flex; gap:0; margin-bottom:12px; border-radius:8px; overflow:hidden; border:1.5px solid var(--border); }
+  .status-tab { flex:1; padding:8px 0; text-align:center; font-size:13px; font-weight:600; cursor:pointer; background:#f8f9fa; color:var(--text-secondary); transition:all .2s; border:none; font-family:inherit; }
+  .status-tab:hover { background:#e8f0fe; }
+  .status-tab.active { background:var(--primary); color:#fff; }
+  .status-tab .count { font-size:11px; margin-left:4px; opacity:.7; }
+
+  /* Resigned item styling */
+  .trainee-item.resigned { opacity:.65; }
+  .trainee-item.resigned .name::after { content:" [已离职]"; font-size:11px; color:var(--danger); font-weight:400; }
+  .trainee-item .btn-resign { background:none; border:1px solid var(--border); color:var(--text-secondary); padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer; transition:all .2s; font-family:inherit; }
+  .trainee-item .btn-resign:hover { border-color:var(--danger); color:var(--danger); background:#fce8e6; }
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay" style="display:none;">
+  <div class="loading-spinner"></div>
+</div>
+
+<!-- Setup Page (首次配置) -->
+<div id="setupPage" style="display:none;">
+  <div class="setup-card">
+    <div class="login-logo">⚙️</div>
+    <h2>系统初始化配置</h2>
+    <div class="desc">首次使用需要配置 Supabase 连接信息，请按以下步骤操作：</div>
+    <div class="login-success" id="setupSuccess"></div>
+    <div class="login-error" id="setupError"></div>
+    <div class="form-group">
+      <label>Supabase Project URL</label>
+      <input type="text" id="setupUrl" placeholder="https://xxxxx.supabase.co">
+    </div>
+    <div class="form-group">
+      <label>Supabase Anon Public Key</label>
+      <input type="text" id="setupKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+    </div>
+    <button class="login-btn" onclick="saveSetup()">💾 保存配置并继续</button>
+    <div class="setup-step">
+      <strong>获取方法：</strong><br>
+      1. 打开 <a href="https://supabase.com" target="_blank">supabase.com</a> 并登录<br>
+      2. 进入你的项目 → Settings → API<br>
+      3. 复制 <strong>Project URL</strong> 和 <strong>anon public</strong> key
+    </div>
+  </div>
+</div>
+
+<!-- Login Page -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">🏭</div>
+    <div class="login-title">新人培训跟踪系统</div>
+    <div class="login-subtitle">飞鹤乳业克东分公司 · 生产部制粉部门</div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-success" id="loginSuccess"></div>
+
+    <!-- 登录表单 -->
+    <div id="loginForm">
+      <div class="login-form-group">
+        <label>用户名</label>
+        <input type="text" id="loginUsername" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="login-form-group">
+        <label>密码</label>
+        <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <button class="login-btn" onclick="doLogin()">登　录</button>
+      <div class="login-switch">还没有账号？<a onclick="showRegister()">立即注册</a></div>
+      <div class="login-hint">
+        <strong>默认管理员：</strong><code>admin</code> / <code>admin123</code><br>
+        主管可自行注册账号
+      </div>
+    </div>
+
+    <!-- 注册表单 -->
+    <div id="registerForm" style="display:none;">
+      <div class="login-form-group">
+        <label>姓名 *</label>
+        <input type="text" id="regName" placeholder="请输入您的真实姓名">
+      </div>
+      <div class="login-form-group">
+        <label>登录用户名 *</label>
+        <input type="text" id="regUsername" placeholder="设置登录用户名">
+      </div>
+      <div class="login-form-group">
+        <label>密码 *</label>
+        <input type="password" id="regPassword" placeholder="设置密码（至少4位）">
+      </div>
+      <div class="login-form-group">
+        <label>确认密码 *</label>
+        <input type="password" id="regPassword2" placeholder="再次输入密码">
+      </div>
+      <button class="login-btn register-btn" onclick="doRegister()">注　册</button>
+      <div class="login-switch">已有账号？<a onclick="showLogin()">返回登录</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- App Page -->
+<div id="appPage">
+  <div class="header">
+    <div class="header-left">
+      <span class="header-icon">📋</span>
+      <div>
+        <h1>新人培训跟踪系统</h1>
+        <div class="subtitle"><span class="online-dot"></span>飞鹤乳业克东分公司 · 生产部制粉部门</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-badge">
+        👤 <span id="headerUsername"></span>
+        <span class="badge-role" id="headerRole"></span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <div class="container" id="mainContainer">
+    <div id="adminPanelLink" style="display:none;margin-bottom:16px;">
+      <div class="card" style="padding:14px 20px;">
+        <span style="font-size:13px;color:var(--text-secondary);">管理员功能：</span>
+        <button class="btn btn-outline btn-sm" onclick="showAccountManager()" style="margin-left:8px;">👤 账号管理</button>
+        <button class="btn btn-outline btn-sm" onclick="showDataStats()" style="margin-left:6px;">📊 数据统计</button>
+      </div>
+    </div>
+    <div class="summary-row" id="summaryRow"></div>
+    <div class="grid-2">
+      <div class="left-panel" id="leftPanel"></div>
+      <div class="right-panel" id="rightPanel"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="modalContainer"></div>
+
+<!-- Lightbox -->
+<div id="lightbox" style="display:none;" onclick="closeLightbox()"></div>
+
+<!-- Toast -->
+<div id="toastContainer"></div>
+
+<script>
+// ==================== Supabase 初始化 ====================
+var CONFIG_KEY = "feihe_supabase_config";
+var SESSION_KEY = "feihe_session";
+var supabase = null;
+var currentUser = null;
+var allDataCache = null; // 培训数据缓存
+
+// 培训计划数据（静态）
+var TRAINING_PLANS = {
+  "前处理": [
+    {seq:1,item:"人流物流管理规程",days:3},{seq:2,item:"清洁消毒管理规程",days:3},{seq:3,item:"管理及考核制度",days:3},
+    {seq:4,item:"乳的主要成分及特性",days:3},{seq:5,item:"什么是配方",days:3},{seq:6,item:"什么是脱脂奶",days:3},
+    {seq:7,item:"风险评估的实际应用",days:7},{seq:8,item:"阀门、泵、巴氏运行原理",days:7},
+    {seq:9,item:"工艺原理、工艺流程",days:7},{seq:10,item:"现场设备名称及分布",days:7},
+    {seq:11,item:"现场管线走向识别",days:7},{seq:12,item:"现场5s管理、工器具使用管理",days:7},
+    {seq:13,item:"前处理QMS",days:30},{seq:14,item:"取样注意事项及操作",days:30},
+    {seq:15,item:"前置性指标收集管理、过滤器拆检",days:30},{seq:16,item:"阀门点检、巡检注意事项",days:30},
+    {seq:17,item:"奶车打耙",days:60},{seq:18,item:"收奶",days:60},{seq:19,item:"奶车清洗参数",days:60},
+    {seq:20,item:"取样工具清洁消毒",days:60},{seq:21,item:"刷车回流过滤器拆检",days:60},
+    {seq:22,item:"奶车刷洗",days:60},{seq:23,item:"收奶线清洗",days:60},{seq:24,item:"收奶过滤器拆检",days:60},
+    {seq:25,item:"脱脂奶外调",days:60},{seq:26,item:"低聚半乳糖添加管线清洗",days:60},
+    {seq:27,item:"湿混线、营养素缸清洗",days:60},{seq:28,item:"油过滤器拆卸清洁",days:60},
+    {seq:29,item:"小料过滤器拆卸清洁",days:60},{seq:30,item:"前处理工序PDA使用",days:60},
+    {seq:31,item:"前处理工序小料脱包",days:60},{seq:32,item:"前处理工序MES系统-小料投料",days:60},
+    {seq:33,item:"前处理领料（小料）",days:60},{seq:34,item:"前处理小料缸、小料斗添加",days:60},
+    {seq:35,item:"前处理低聚半乳糖接收",days:60},{seq:36,item:"前处理整包物料抽检",days:60},
+    {seq:37,item:"前处理低聚乳糖添加",days:60},{seq:38,item:"前处理工序MES系统-糖料投料",days:60},
+    {seq:39,item:"校称",days:60},{seq:40,item:"地漏刷洗",days:60},{seq:41,item:"前处理桶装油接收",days:60},
+    {seq:42,item:"工具清洁消毒",days:60},{seq:43,item:"气体过滤器点检更换",days:60},
+    {seq:44,item:"桶装油抽油",days:60},{seq:45,item:"机械手吸盘更换",days:60},
+    {seq:46,item:"磁栅拆检安装",days:60},{seq:47,item:"粉输送系统拆清",days:60},
+    {seq:48,item:"原料磁栅拆卸清",days:60},{seq:49,item:"前处理工序投粉前设备检查",days:60},
+    {seq:50,item:"前处理领料（大料）",days:60},{seq:51,item:"前处理工序MES系统大料投料",days:60},
+    {seq:52,item:"前处理工序机械手臂启动",days:60},{seq:53,item:"前处理工序PDA中料接收赋码",days:60},
+    {seq:54,item:"前处理中料分料",days:60},{seq:55,item:"前处理工序中料添加",days:60},
+    {seq:56,item:"前处理原料投料",days:60},{seq:57,item:"前处理工序FG粉取样",days:60},
+    {seq:58,item:"投料仓磁栅拆检",days:60},{seq:59,item:"前处理工序接头、尾粉",days:60},
+    {seq:60,item:"放布袋粉",days:60},{seq:61,item:"前处理物料清场",days:60},
+    {seq:62,item:"前处理设备清场",days:60},{seq:63,item:"前处理环境清场",days:60},
+    {seq:64,item:"前处理工具清场",days:60},{seq:65,item:"清洁工具管理",days:60},
+    {seq:66,item:"工器具烘干",days:60},{seq:67,item:"烘干箱清洁",days:60},
+    {seq:68,item:"工器具浸泡",days:60},{seq:69,item:"工器具清洗",days:60},
+    {seq:70,item:"工器具消毒",days:60},{seq:71,item:"物料均质",days:60},
+    {seq:72,item:"酸碱接收",days:60},{seq:73,item:"均质双联过滤器拆检",days:60},
+    {seq:74,item:"巴氏机组运行监控",days:60},{seq:75,item:"巴氏生产",days:60},
+    {seq:76,item:"巴氏清洗",days:60},{seq:77,item:"前处理工序PDA使用",days:60},
+    {seq:78,item:"前处理工序油接收",days:60},{seq:79,item:"百吨罐清洗",days:60},
+    {seq:80,item:"湿混罐清洗",days:60},{seq:81,item:"湿混线清洗",days:60},
+    {seq:82,item:"均质线清洗",days:60},{seq:83,item:"调奶线清洗",days:60},
+    {seq:84,item:"供料管线清洗",days:60},{seq:85,item:"湿混储存罐清洗",days:60},
+    {seq:86,item:"CIP回流过滤器拆卸清洁",days:60},{seq:87,item:"湿混过滤器拆卸清洁",days:60},
+    {seq:88,item:"CIP取样",days:60},{seq:89,item:"CIP过滤器拆检",days:60},
+    {seq:90,item:"供料磁栅拆检",days:60},{seq:91,item:"前处理桶装油接收",days:90},
+    {seq:92,item:"混料",days:90},{seq:93,item:"均质",days:90},{seq:94,item:"槽车油接收",days:90},
+    {seq:95,item:"生乳取样",days:90},{seq:96,item:"巴氏杀菌工序过氧乙酸清洗",days:90},
+    {seq:97,item:"巴氏杀菌工序巴氏工单创建",days:90},{seq:98,item:"分离操作",days:90},
+    {seq:99,item:"前处理工序小料脱包",days:90},{seq:100,item:"前处理工序FG粉取样",days:90},
+    {seq:101,item:"软化水取样",days:90},{seq:102,item:"均质过滤器拆卸清",days:90},
+    {seq:103,item:"油储罐清洗",days:90},{seq:104,item:"油称重罐清洗",days:90},
+    {seq:105,item:"进油线清洗",days:90},{seq:106,item:"巴氏过滤器拆检",days:90},
+    {seq:107,item:"蝶式回流过滤器",days:90},{seq:108,item:"均质布袋更换",days:90},
+    {seq:109,item:"混料过滤器拆检",days:90},{seq:110,item:"放头尾粉",days:90},
+    {seq:111,item:"接收浓酸浓碱",days:90},{seq:112,item:"前处理记录清场",days:90},
+  ],
+  "乳铁": [
+    {seq:1,item:"人流物流管理规程",days:3},{seq:2,item:"清洁消毒管理规程",days:3},{seq:3,item:"管理及考核制度",days:3},
+    {seq:4,item:"乳的主要成分及特性",days:3},{seq:5,item:"什么是乳铁蛋白",days:3},
+    {seq:6,item:"风险评估的实际应用",days:7},{seq:7,item:"阀门、泵原理",days:7},
+    {seq:8,item:"层析柱工艺原理、工艺流程",days:7},{seq:9,item:"超滤工艺原理、工艺流程",days:7},
+    {seq:10,item:"除菌工艺原理、工艺流程",days:7},{seq:11,item:"物料系统现场设备名称及分布",days:7},
+    {seq:12,item:"干燥现场设备名称及分布",days:7},{seq:13,item:"现场管线梳理",days:7},
+    {seq:14,item:"现场5s管理、工器具使用管理",days:7},
+    {seq:15,item:"层析系统生产前点检",days:30},{seq:16,item:"层析系统水平衡",days:30},
+    {seq:17,item:"会析系统上样",days:30},{seq:18,item:"层析系统水冲洗",days:30},
+    {seq:19,item:"层析系统NaCl配置",days:30},{seq:20,item:"层析系统氯化钠冲洗和洗脱",days:30},
+    {seq:21,item:"会析系统NaOH配置",days:30},{seq:22,item:"层析系统NaOH清洗与封存",days:60},
+    {seq:23,item:"超滤系统生产前点检",days:60},{seq:24,item:"超滤系统生产前清洗",days:60},
+    {seq:25,item:"超滤系统生产",days:60},{seq:26,item:"超滤系统生产后水洗",days:60},
+    {seq:27,item:"超滤系统生产后碱",days:60},{seq:28,item:"超滤系统封存",days:60},
+    {seq:29,item:"乳铁蛋白包装机",days:60},{seq:30,item:"乳铁蛋白包装",days:60},
+    {seq:31,item:"2.4%盐水罐清洗",days:60},{seq:32,item:"5.9%盐水罐清洗",days:60},
+    {seq:33,item:"纯水罐清洗",days:60},{seq:34,item:"碱罐清洗",days:60},
+    {seq:35,item:"样品罐至超滤管线清洗",days:60},{seq:36,item:"脱气至层析管线清洗",days:60},
+    {seq:37,item:"脱气前层析后管线",days:60},{seq:38,item:"脱气罐清洗",days:60},
+    {seq:39,item:"样品罐清洗",days:60},
+    {seq:40,item:"低温干燥塔生产前点检",days:90},{seq:41,item:"低温干燥塔物料接收",days:90},
+    {seq:42,item:"低温干燥塔雾化器安装与拆卸",days:90},{seq:43,item:"低温干燥塔CIP",days:90},
+    {seq:44,item:"低温干燥塔CIP前转换",days:90},{seq:45,item:"低温干燥塔COP点",days:90},
+    {seq:46,item:"低温干燥塔",days:90},{seq:47,item:"乳铁蛋白接粉包装",days:90},
+  ],
+  "稀奶油": [
+    {seq:1,item:"人流物流管理规程",days:3},{seq:2,item:"清洁消毒管理规程",days:3},{seq:3,item:"管理及考核制度",days:3},
+    {seq:4,item:"乳的主要成分及特性",days:3},{seq:5,item:"什么是稀奶油",days:3},
+    {seq:6,item:"什么是脱脂奶",days:3},{seq:7,item:"风险评估的实际应用",days:7},
+    {seq:8,item:"阀门、泵、巴氏运行原理",days:7},{seq:9,item:"工艺原理、工艺流程",days:7},
+    {seq:10,item:"现场设备名称及分布",days:7},{seq:11,item:"现场管线走向识别",days:7},
+    {seq:12,item:"现场5s管理、工器具使用管理",days:7},
+    {seq:13,item:"稀奶油QMS",days:30},{seq:14,item:"取样注意事项及操作",days:30},
+    {seq:15,item:"前置性指标收集管理、过滤器拆检",days:30},{seq:16,item:"阀门点检、巡检注意事项",days:30},
+    {seq:17,item:"MES记录、工单使用",days:60},{seq:18,item:"巴杀启机机",days:60},
+    {seq:19,item:"巴氏生产",days:60},{seq:20,item:"巴氏清洗",days:60},
+    {seq:21,item:"稀奶油分离操作",days:60},{seq:22,item:"稀奶油巴氏生产",days:60},
+    {seq:23,item:"稀奶油巴氏清洗",days:60},{seq:24,item:"稀奶油阀阵拆检",days:60},
+    {seq:25,item:"灌装机灌装拆检",days:60},{seq:26,item:"灌装机灌装生产",days:60},
+    {seq:27,item:"稀奶油设备清洗操作",days:60},{seq:28,item:"稀奶油取样",days:60},
+    {seq:29,item:"CIP回流过滤器拆卸清洁",days:60},{seq:30,item:"喷码机启停",days:60},
+    {seq:31,item:"喷码机调整日期、更换墨盒",days:60},{seq:32,item:"稀奶油电子秤校准、参数设定",days:60},
+    {seq:33,item:"开箱机操作",days:60},{seq:34,item:"装箱机操作",days:60},
+    {seq:35,item:"打码机操作",days:60},{seq:36,item:"码垛机操作",days:60},
+    {seq:37,item:"电子秤校准",days:60},{seq:38,item:"MES记录、工单使用",days:60},
+    {seq:39,item:"暂存罐点检",days:60},
+    {seq:40,item:"稀奶油脂肪调整",days:90},{seq:41,item:"巴氏参数调整、故障维修",days:90},
+    {seq:42,item:"稀奶油巴氏参数调整、故障维修",days:90},{seq:43,item:"开箱机故障维护",days:90},
+    {seq:44,item:"装箱机故障维护",days:90},{seq:45,item:"打码机故障维护",days:90},
+    {seq:46,item:"码垛机故障维护",days:90},
+  ],
+  "蒸发器": [
+    {seq:1,item:"人流物流管理规程",days:3},{seq:2,item:"清洁消毒管理规程",days:3},{seq:3,item:"管理及考核制度",days:3},
+    {seq:4,item:"乳的主要成分及特性",days:3},{seq:5,item:"什么是蒸发器",days:3},
+    {seq:6,item:"风险评估的实际应用",days:7},{seq:7,item:"阀门、泵原理",days:7},
+    {seq:8,item:"蒸发器工艺原理、工艺流程",days:7},{seq:9,item:"蒸发器现场设备名称及分布",days:7},
+    {seq:10,item:"现场管线梳理",days:7},{seq:11,item:"现场5s管理、工器具使用管理",days:7},
+    {seq:12,item:"蒸发干燥QMS",days:30},{seq:13,item:"蒸发浓度控制原理",days:30},
+    {seq:14,item:"取样注意事项及操作",days:30},{seq:15,item:"前置性指标收集管理、过滤器拆检",days:30},
+    {seq:16,item:"点检、巡检注意事项",days:30},
+    {seq:17,item:"蒸发器生产前准备工作标准化作业指导书",days:60},
+    {seq:18,item:"蒸发器停机标准化作业指导书",days:60},
+    {seq:19,item:"蒸发器清洗标准化作业指导书",days:60},
+    {seq:20,item:"蒸发器过氧乙酸清洗标准化作业指导书",days:60},
+    {seq:21,item:"蒸发器CIP过滤器拆检标准化作业指导书",days:60},
+    {seq:22,item:"蒸发器水样作业指导书",days:60},
+    {seq:23,item:"蒸发器清洗液取样标准化作业指导书",days:90},
+    {seq:24,item:"蒸发器稀奶取样标准化作业指导书",days:90},
+    {seq:25,item:"蒸发器气液分离器拆检标准化作业指导书",days:90},
+    {seq:26,item:"蒸发器拆检DSI标准化作业指导书",days:90},
+    {seq:27,item:"蒸发器上盖拆检标准化作业指导书",days:90},
+    {seq:28,item:"蒸发器巡检标准化作业指导书",days:90},
+    {seq:29,item:"蒸发器切换标准化作业指导书",days:90},
+    {seq:30,item:"蒸发器启机标准化作业指导书",days:90},
+    {seq:31,item:"蒸发器停止生产标准化作业指导书",days:90},
+    {seq:32,item:"蒸发工序取样（水/酸碱/浓奶）作业指导书",days:90},
+  ],
+  "干燥塔": [
+    {seq:1,item:"人流物流管理规程",days:3},{seq:2,item:"清洁消毒管理规程",days:3},{seq:3,item:"管理及考核制度",days:3},
+    {seq:4,item:"乳的主要成分及特性",days:3},{seq:5,item:"什么是蒸发干燥",days:3},
+    {seq:6,item:"风险评估的实际应用",days:7},{seq:7,item:"阀门、泵原理",days:7},
+    {seq:8,item:"蒸发器工艺原理、工艺流程",days:7},{seq:9,item:"干燥工艺原理、工艺流程",days:7},
+    {seq:10,item:"干燥塔现场设备名称及分布",days:7},{seq:11,item:"干燥现场设备名称及分布",days:7},
+    {seq:12,item:"现场管线梳理",days:7},{seq:13,item:"现场5s管理、工器具使用管理",days:7},
+    {seq:14,item:"干燥QMS",days:30},{seq:15,item:"干燥塔客诉",days:30},
+    {seq:16,item:"干燥水分原理",days:30},{seq:17,item:"干燥理化指标控制原理",days:30},
+    {seq:18,item:"取样注意事项及操作",days:30},{seq:19,item:"前置性指标收集管理、过滤器拆检",days:30},
+    {seq:20,item:"点检、巡检注意事项",days:30},
+    {seq:21,item:"干燥工序清洗液取样作业指导书",days:60},{seq:22,item:"工具清洁消毒作业指导书",days:60},
+    {seq:23,item:"干燥塔CIP过滤器拆检作业指导书",days:60},{seq:24,item:"喷枪卡扣调整作业指导书",days:60},
+    {seq:25,item:"物料线水样作业指导书",days:60},{seq:26,item:"干燥塔取浓奶样作业指导书",days:60},
+    {seq:27,item:"干燥塔取清洗作业指导书",days:60},{seq:28,item:"工序粉取样作业指导书",days:60},
+    {seq:29,item:"浓奶双联过滤器拆检作业指导书",days:60},{seq:30,item:"大颗粒取样作业指导书",days:60},
+    {seq:31,item:"洗塔工具作业指导书",days:60},{seq:32,item:"洗塔前中控室确认作业指导书",days:60},
+    {seq:33,item:"消防水测试作业指导书",days:60},{seq:34,item:"旋转阀拆检作业指导书",days:60},
+    {seq:35,item:"气体过滤器点检作业指导书",days:60},{seq:36,item:"行星式喷淋球拆检安装作业指导书",days:60},
+    {seq:37,item:"磁栅拆检作业指导书",days:60},{seq:38,item:"消防喷淋头拆检作业指导书",days:60},
+    {seq:39,item:"袋滤器布袋更换作业指导书",days:60},{seq:40,item:"干燥塔转换生产模式作业指导书",days:60},
+    {seq:41,item:"干燥塔生产前检查作业指导书",days:60},{seq:42,item:"清粉作业指导书",days:60},
+    {seq:43,item:"水洗作业指导书",days:60},{seq:44,item:"预清洗作业指导书",days:60},
+    {seq:45,item:"碱洗作业指导书",days:60},{seq:46,item:"中间水洗作业指导书",days:60},
+    {seq:47,item:"酸洗作业指导书",days:60},{seq:48,item:"最终水洗作业指导书",days:60},
+    {seq:49,item:"喷枪头安装作业指导书",days:60},{seq:50,item:"物料生产结束转CIP作业指导书",days:60},
+    {seq:51,item:"喷枪开启作业指导书",days:60},{seq:52,item:"洗塔后转换作业指导书",days:60},
+    {seq:53,item:"气锤点检作业指导书",days:60},{seq:54,item:"烘塔作业指导书",days:60},
+    {seq:55,item:"振动筛清洁作业指导书",days:60},{seq:56,item:"振动筛安装作业指导书",days:60},
+    {seq:57,item:"干燥塔启机作业指导书",days:60},{seq:58,item:"干燥塔运行过程监控作业指导书",days:60},
+    {seq:59,item:"干燥塔停机作业指导书",days:60},
+    {seq:60,item:"均质使用作业指导书",days:90},{seq:61,item:"干燥塔CIP转换作业指导书",days:90},
+    {seq:62,item:"干燥塔COP点清洁作业指导书",days:90},{seq:63,item:"旋转阀拆检作业指导书",days:90},
+    {seq:64,item:"风系统过滤器点检更换作业指导书",days:90},{seq:65,item:"粉输送拆清消作业指导书",days:90},
+  ],
+};
+
+// ==================== 初始化 ====================
+function initSupabase() {
+  var config = JSON.parse(localStorage.getItem(CONFIG_KEY) || "null");
+  if (!config || !config.url || !config.key) return false;
+  try {
+    supabase = window.supabase.createClient(config.url, config.key);
+    return true;
+  } catch(e) {
+    console.error("Supabase init error:", e);
+    return false;
+  }
+}
+
+function showLoading(show) {
+  document.getElementById("loadingOverlay").style.display = show ? "flex" : "none";
+}
+
+// ==================== 启动流程 ====================
+function boot() {
+  if (!initSupabase()) {
+    // 首次使用，显示配置页
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("setupPage").style.display = "flex";
+    return;
+  }
+
+  // 检查本地会话
+  var session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+  if (session) {
+    currentUser = session;
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("appPage").style.display = "block";
+    initApp();
+  }
+}
+
+// 等待 Supabase 库加载完成
+if (window.supabase && window.supabase.createClient) {
+  boot();
+} else {
+  window.addEventListener('supabaseReady', boot, { once: true });
+}
+
+function saveSetup() {
+  var url = document.getElementById("setupUrl").value.trim();
+  var key = document.getElementById("setupKey").value.trim();
+  var errEl = document.getElementById("setupError");
+  var sucEl = document.getElementById("setupSuccess");
+
+  if (!url || !key) {
+    errEl.textContent = "请填写 Supabase URL 和 Key";
+    errEl.style.display = "block";
+    sucEl.style.display = "none";
+    return;
+  }
+
+  // 验证连接
+  try {
+    var testClient = window.supabase.createClient(url, key);
+    console.log("Supabase client created, testing connection...");
+    testClient.from("accounts").select("id").limit(1).then(function(res) {
+      console.log("Connection test response:", res);
+      if (res.error) {
+        console.error("Query error:", res.error);
+        // 如果是因为表空或者权限问题，仍然允许保存
+        if (res.error.code === "PGRST116" || res.error.message && res.error.message.includes("Results")) {
+          // 表存在但无数据，这是正常的
+          localStorage.setItem(CONFIG_KEY, JSON.stringify({ url: url, key: key }));
+          supabase = testClient;
+          document.getElementById("setupPage").style.display = "none";
+          document.getElementById("loginPage").style.display = "flex";
+          showToast("Supabase 连接成功", "success");
+          return;
+        }
+        throw res.error;
+      }
+
+      localStorage.setItem(CONFIG_KEY, JSON.stringify({ url: url, key: key }));
+      supabase = testClient;
+
+      document.getElementById("setupPage").style.display = "none";
+      document.getElementById("loginPage").style.display = "flex";
+      showToast("Supabase 连接成功", "success");
+    }).catch(function(err) {
+      console.error("Connection test failed:", err);
+      errEl.textContent = "连接失败：" + (err.message || err.msg || "请检查 URL 和 Key 是否正确");
+      errEl.style.display = "block";
+      sucEl.style.display = "none";
+    });
+  } catch(e) {
+    console.error("Client creation failed:", e);
+    errEl.textContent = "初始化失败：" + e.message;
+    errEl.style.display = "block";
+  }
+}
+
+// ==================== 登录/注册 UI 切换 ====================
+function showRegister() {
+  document.getElementById("loginForm").style.display = "none";
+  document.getElementById("registerForm").style.display = "block";
+  document.getElementById("loginError").style.display = "none";
+  document.getElementById("loginSuccess").style.display = "none";
+}
+
+function showLogin() {
+  document.getElementById("loginForm").style.display = "block";
+  document.getElementById("registerForm").style.display = "none";
+  document.getElementById("loginError").style.display = "none";
+  document.getElementById("loginSuccess").style.display = "none";
+}
+
+// ==================== 登录 ====================
+function doLogin() {
+  var username = document.getElementById("loginUsername").value.trim();
+  var password = document.getElementById("loginPassword").value;
+  var errEl = document.getElementById("loginError");
+
+  if (!username || !password) {
+    errEl.textContent = "请输入用户名和密码";
+    errEl.style.display = "block";
+    return;
+  }
+
+  showLoading(true);
+
+  supabase.from("accounts").select("*").eq("username", username).eq("password", password).single()
+    .then(function(res) {
+      showLoading(false);
+      if (res.error || !res.data) {
+        errEl.textContent = "用户名或密码错误，请重试";
+        errEl.style.display = "block";
+        return;
+      }
+
+      currentUser = { id: res.data.id, username: res.data.username, name: res.data.name, role: res.data.role };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("appPage").style.display = "block";
+      document.getElementById("loginPassword").value = "";
+
+      initApp();
+    })
+    .catch(function(err) {
+      showLoading(false);
+      errEl.textContent = "登录失败：" + (err.message || "网络错误");
+      errEl.style.display = "block";
+    });
+}
+
+// ==================== 注册 ====================
+function doRegister() {
+  var name = document.getElementById("regName").value.trim();
+  var username = document.getElementById("regUsername").value.trim();
+  var password = document.getElementById("regPassword").value;
+  var password2 = document.getElementById("regPassword2").value;
+  var errEl = document.getElementById("loginError");
+
+  if (!name || !username || !password) {
+    errEl.textContent = "请填写完整信息";
+    errEl.style.display = "block";
+    return;
+  }
+  if (password.length < 4) {
+    errEl.textContent = "密码至少4位";
+    errEl.style.display = "block";
+    return;
+  }
+  if (password !== password2) {
+    errEl.textContent = "两次密码输入不一致";
+    errEl.style.display = "block";
+    return;
+  }
+
+  showLoading(true);
+
+  // 检查用户名是否已存在
+  supabase.from("accounts").select("id").eq("username", username).single()
+    .then(function(checkRes) {
+      if (checkRes.data) {
+        showLoading(false);
+        errEl.textContent = "用户名已被占用，请更换";
+        errEl.style.display = "block";
+        return;
+      }
+
+      // 创建账号（默认 supervisor 角色）
+      return supabase.from("accounts").insert({
+        username: username,
+        password: password,
+        name: name,
+        role: "supervisor"
+      }).select().single();
+    })
+    .then(function(res) {
+      if (res && res.data) {
+        showLoading(false);
+        showToast("注册成功！请使用新账号登录", "success");
+        showLogin();
+        // 自动填入用户名
+        document.getElementById("loginUsername").value = username;
+      }
+    })
+    .catch(function(err) {
+      showLoading(false);
+      errEl.textContent = "注册失败：" + (err.message || "网络错误");
+      errEl.style.display = "block";
+    });
+}
+
+function doLogout() {
+  currentUser = null;
+  allDataCache = null;
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById("appPage").style.display = "none";
+  document.getElementById("loginPage").style.display = "flex";
+  document.getElementById("loginUsername").value = "";
+  document.getElementById("loginPassword").value = "";
+}
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && document.getElementById("loginPage").style.display !== "none") {
+    if (document.getElementById("registerForm").style.display !== "none") {
+      doRegister();
+    } else {
+      doLogin();
+    }
+  }
+});
+
+// ==================== 工具函数 ====================
+function isAdmin() { return currentUser && currentUser.role === "admin"; }
+function isSupervisor() { return currentUser && currentUser.role === "supervisor"; }
+
+function formatDate(date) {
+  var y = date.getFullYear();
+  var m = String(date.getMonth() + 1).padStart(2, "0");
+  var d = String(date.getDate()).padStart(2, "0");
+  return y + m + d;
+}
+
+function formatDateDisplay(date) {
+  var y = date.getFullYear();
+  var m = String(date.getMonth() + 1).padStart(2, "0");
+  var d = String(date.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + d;
+}
+
+function generatePlan(position, startDateStr) {
+  var plan = TRAINING_PLANS[position];
+  if (!plan) return [];
+  var startDate = new Date(startDateStr);
+  var items = [];
+  for (var i = 0; i < plan.length; i++) {
+    var step = plan[i];
+    var dueDate = new Date(startDate);
+    dueDate.setDate(dueDate.getDate() + step.days);
+    items.push({
+      seq: step.seq, item_name: step.item, plan_days: step.days,
+      due_date: formatDate(dueDate), completed: false, completed_date: null
+    });
+  }
+  return items;
+}
+
+function getStatus(dueDateStr, completed) {
+  if (completed) return { type: "completed", label: "已完成", cls: "on-track", badge: "badge-green" };
+  var ds = dueDateStr;
+  if (ds.length === 8) ds = ds.slice(0,4) + "-" + ds.slice(4,6) + "-" + ds.slice(6,8);
+  var dueDate = new Date(ds);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var diffDays = Math.ceil((dueDate - today) / (1000*60*60*24));
+  if (diffDays < 0) return { type: "overdue", label: "已逾期", cls: "overdue", badge: "badge-red", diff: diffDays };
+  if (diffDays <= 7) return { type: "due-soon", label: "即将到期", cls: "due-soon", badge: "badge-yellow", diff: diffDays };
+  return { type: "on-track", label: "进度正常", cls: "on-track", badge: "badge-green", diff: diffDays };
+}
+
+function showToast(msg, type) {
+  var toast = document.createElement("div");
+  toast.className = "toast toast-" + type;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 2500);
+}
+
+function closeModal() { document.getElementById("modalContainer").innerHTML = ""; }
+
+function getCssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#dadce0";
+}
+
+function escHtml(s) {
+  var d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ==================== 数据操作（Supabase）====================
+function getAllTrainees() {
+  return new Promise(function(resolve, reject) {
+    showLoading(true);
+    supabase.from("trainees").select("*").order("created_at", { ascending: false })
+      .then(function(res) {
+        showLoading(false);
+        if (res.error) { reject(res.error); return; }
+        resolve(res.data || []);
+      })
+      .catch(reject);
+  });
+}
+
+function getMyTrainees() {
+  return new Promise(function(resolve, reject) {
+    var query = supabase.from("trainees").select("*").order("created_at", { ascending: false });
+    if (!isAdmin()) {
+      query = query.eq("supervisor", currentUser.name);
+    }
+    query.then(function(res) {
+      if (res.error) { reject(res.error); return; }
+      resolve(res.data || []);
+    }).catch(reject);
+  });
+}
+
+function getTrainingItems(traineeId) {
+  return new Promise(function(resolve, reject) {
+    supabase.from("training_items").select("*").eq("trainee_id", traineeId).order("seq", { ascending: true })
+      .then(function(res) {
+        if (res.error) { reject(res.error); return; }
+        resolve(res.data || []);
+      }).catch(reject);
+  });
+}
+
+function getAttachments(itemId) {
+  return new Promise(function(resolve, reject) {
+    supabase.from("attachments").select("*").eq("item_id", itemId).order("uploaded_at", { ascending: true })
+      .then(function(res) {
+        if (res.error) { reject(res.error); return; }
+        resolve(res.data || []);
+      }).catch(reject);
+  });
+}
+
+// ==================== App Init ====================
+var currentTraineeId = null;
+var currentListTab = "active";
+var currentTraineeItems = [];
+
+function initApp() {
+  var user = currentUser;
+  if (!user) { doLogout(); return; }
+
+  document.getElementById("headerUsername").textContent = user.name;
+  document.getElementById("headerRole").textContent = user.role === "admin" ? "管理员" : "主管";
+  document.getElementById("adminPanelLink").style.display = isAdmin() ? "block" : "none";
+
+  renderAll();
+}
+
+async function renderAll() {
+  try {
+    var trainees = await getMyTrainees();
+    allDataCache = trainees;
+    renderAddForm();
+    renderSummary(trainees);
+    renderTraineeList(trainees);
+    if (currentTraineeId) {
+      await loadTraineeDetail(currentTraineeId);
+    } else {
+      renderDetailPlaceholder();
+    }
+  } catch(e) {
+    showToast("加载数据失败：" + e.message, "error");
+  }
+}
+
+// ==================== Render Add Form ====================
+async function renderAddForm() {
+  var leftPanel = document.getElementById("leftPanel");
+  var user = currentUser;
+  var isSup = isSupervisor();
+  var isAdm = isAdmin();
+
+  if (!isAdm && !isSup) {
+    leftPanel.innerHTML = '<div class="card"><div class="card-title"><span class="icon">ℹ️</span> 权限说明</div><p style="font-size:14px;color:var(--text-secondary);line-height:1.8;">当前账号无权限。</p></div>';
+    return;
+  }
+
+  // 获取主管列表（管理员需要）
+  var supervisors = [];
+  if (isAdm) {
+    try {
+      var res = await supabase.from("accounts").select("*").eq("role", "supervisor").order("created_at", { ascending: true });
+      supervisors = res.data || [];
+    } catch(e) {}
+  }
+
+  var formHtml = '<div class="card"><div class="card-title"><span class="icon">➕</span> 添加新人</div>' +
+    '<div class="form-group"><label>新人姓名 *</label><input type="text" id="inputName" placeholder="请输入新人姓名"></div>' +
+    '<div class="form-group"><label>岗位 *</label><select id="inputPosition"><option value="">-- 请选择岗位 --</option>' +
+    '<option value="前处理">前处理</option><option value="乳铁">乳铁</option><option value="稀奶油">稀奶油</option>' +
+    '<option value="蒸发器">蒸发器</option><option value="干燥塔">干燥塔</option></select></div>' +
+    '<div class="form-row"><div class="form-group"><label>入职日期 *</label><input type="date" id="inputStartDate"></div>';
+
+  if (isAdm) {
+    var supOptions = '<option value="">-- 请选择主管 --</option>';
+    for (var j = 0; j < supervisors.length; j++) {
+      supOptions += '<option value="' + escHtml(supervisors[j].name) + '">' + escHtml(supervisors[j].name) + '</option>';
+    }
+    formHtml += '<div class="form-group"><label>对应主管 *</label><select id="inputSupervisor">' + supOptions + '</select></div>';
+  } else {
+    formHtml += '<div class="form-group"><label>对应主管</label><input type="text" value="' + escHtml(user.name) + '" disabled style="background:#f1f3f4;color:#5f6368;"></div>';
+  }
+
+  formHtml += '</div><button class="btn btn-primary" onclick="addTrainee()">✅ 生成培训跟踪状态</button></div>';
+
+  var listHtml = '<div class="card"><div class="card-title"><span class="icon">👥</span> 培训人员列表</div>' +
+    '<div class="status-tabs" id="statusTabs">' +
+    '<button class="status-tab active" onclick="switchListTab(\'active\')">在　培<span class="count" id="activeCount"></span></button>' +
+    '<button class="status-tab" onclick="switchListTab(\'resigned\')">已离职<span class="count" id="resignedCount"></span></button>' +
+    '</div><div class="trainee-list" id="traineeList"></div></div>';
+
+  var btnHtml = '<div class="btn-bar">' +
+    '<button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 导出CSV</button>' +
+    '<button class="btn btn-outline btn-sm" onclick="exportJSON()">📤 导出JSON</button>';
+  if (isAdm) {
+    btnHtml += '<button class="btn btn-outline btn-sm" onclick="showFeishuConfig()">⚙️ 飞书配置</button>';
+    btnHtml += '<button class="btn btn-outline btn-sm" onclick="pushReminder()">🔔 推送提醒</button>';
+  }
+  btnHtml += '<button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ 打印</button></div>';
+
+  leftPanel.innerHTML = formHtml + listHtml + btnHtml;
+
+  // 设置默认日期
+  var startDateEl = document.getElementById("inputStartDate");
+  if (startDateEl) startDateEl.value = formatDateDisplay(new Date());
+
+  // 刷新列表
+  var trainees = allDataCache || [];
+  renderTraineeList(trainees);
+}
+
+async function addTrainee() {
+  var name = document.getElementById("inputName").value.trim();
+  var position = document.getElementById("inputPosition").value;
+  var startDate = document.getElementById("inputStartDate").value;
+  var supervisor = isAdmin() ? (document.getElementById("inputSupervisor").value || "") : currentUser.name;
+
+  if (!name || !position || !startDate || !supervisor) { showToast("请填写完整信息", "warning"); return; }
+
+  showLoading(true);
+  var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  try {
+    // 1. 插入 trainees
+    var traineeRes = await supabase.from("trainees").insert({
+      id: id, name: name, position: position, start_date: startDate,
+      supervisor: supervisor, status: "active"
+    }).select().single();
+
+    if (traineeRes.error) throw traineeRes.error;
+
+    // 2. 生成并插入培训项
+    var planItems = generatePlan(position, startDate);
+    var insertRows = planItems.map(function(item) {
+      return {
+        trainee_id: id, seq: item.seq, item_name: item.item,
+        plan_days: item.plan_days, due_date: item.due_date,
+        completed: false
+      };
+    });
+
+    var itemsRes = await supabase.from("training_items").insert(insertRows);
+    if (itemsRes.error) throw itemsRes.error;
+
+    showLoading(false);
+    currentTraineeId = id;
+
+    // 清空表单
+    document.getElementById("inputName").value = "";
+    document.getElementById("inputPosition").value = "";
+    if (isAdmin()) document.getElementById("inputSupervisor").value = "";
+
+    showToast("已为 " + name + "（" + position + "）生成培训跟踪计划", "success");
+
+    // 飞书推送
+    pushNewTraineeNotification(name, position, startDate, supervisor);
+
+    renderAll();
+  } catch(e) {
+    showLoading(false);
+    showToast("添加失败：" + (e.message || "未知错误"), "error");
+  }
+}
+
+// ==================== Render Summary ====================
+function renderSummary(trainees) {
+  var activeTrainees = trainees.filter(function(t) { return t.status !== "resigned"; });
+  var totalOnTrack = 0, totalDueSoon = 0, totalOverdue = 0;
+
+  // 简化：按列表状态计数
+  for (var t = 0; t < trainees.length; t++) {
+    if (trainees[t].status === "resigned") continue;
+    // 默认标记为正常，详细状态在加载详情时判断
+    totalOnTrack++;
+  }
+
+  document.getElementById("summaryRow").innerHTML =
+    '<div class="summary-card"><div class="num blue">' + activeTrainees.length + '</div><div class="label">在培新人</div></div>' +
+    '<div class="summary-card"><div class="num green">' + totalOnTrack + '</div><div class="label">进度正常</div></div>' +
+    '<div class="summary-card"><div class="num orange">' + totalDueSoon + '</div><div class="label">即将到期(7天)</div></div>' +
+    '<div class="summary-card"><div class="num red">' + totalOverdue + '</div><div class="label">已逾期</div></div>';
+}
+
+async function updateSummaryFromItems(trainees) {
+  var totalOnTrack = 0, totalDueSoon = 0, totalOverdue = 0;
+
+  for (var t = 0; t < trainees.length; t++) {
+    if (trainees[t].status === "resigned") continue;
+    try {
+      var items = await getTrainingItems(trainees[t].id);
+      var hasOverdue = false, hasDueSoon = false;
+      for (var x = 0; x < items.length; x++) {
+        var s = getStatus(items[x].due_date, items[x].completed);
+        if (s.type === "overdue") hasOverdue = true;
+        if (s.type === "due-soon") hasDueSoon = true;
+      }
+      if (hasOverdue) totalOverdue++;
+      else if (hasDueSoon) totalDueSoon++;
+      else totalOnTrack++;
+    } catch(e) { totalOnTrack++; }
+  }
+
+  document.getElementById("summaryRow").innerHTML =
+    '<div class="summary-card"><div class="num blue">' + trainees.filter(function(t){return t.status!=="resigned"}).length + '</div><div class="label">在培新人</div></div>' +
+    '<div class="summary-card"><div class="num green">' + totalOnTrack + '</div><div class="label">进度正常</div></div>' +
+    '<div class="summary-card"><div class="num orange">' + totalDueSoon + '</div><div class="label">即将到期(7天)</div></div>' +
+    '<div class="summary-card"><div class="num red">' + totalOverdue + '</div><div class="label">已逾期</div></div>';
+}
+
+// ==================== Render Trainee List ====================
+function renderTraineeList(trainees) {
+  var container = document.getElementById("traineeList");
+  if (!container) return;
+
+  var activeList = trainees.filter(function(t) { return t.status !== "resigned"; });
+  var resignedList = trainees.filter(function(t) { return t.status === "resigned"; });
+
+  var ac = document.getElementById("activeCount");
+  var rc = document.getElementById("resignedCount");
+  if (ac) ac.textContent = "(" + activeList.length + ")";
+  if (rc) rc.textContent = "(" + resignedList.length + ")";
+
+  var tabs = document.querySelectorAll(".status-tab");
+  for (var ti = 0; ti < tabs.length; ti++) tabs[ti].classList.remove("active");
+  if (currentListTab === "resigned" && tabs.length >= 2) tabs[1].classList.add("active");
+  else if (tabs.length >= 1) tabs[0].classList.add("active");
+
+  var displayList = currentListTab === "resigned" ? resignedList : activeList;
+  if (displayList.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>' + (currentListTab === "resigned" ? "暂无已离职人员" : "暂无在培人员") + '</p></div>';
+    return;
+  }
+
+  // 需要加载每个人员的完成进度来显示
+  renderTraineeListWithProgress(container, displayList);
+}
+
+async function renderTraineeListWithProgress(container, displayList) {
+  var html = "";
+
+  for (var t = 0; t < displayList.length; t++) {
+    var tt = displayList[t];
+    var totalItems = 0, completedItems = 0;
+
+    try {
+      var items = await getTrainingItems(tt.id);
+      totalItems = items.length;
+      for (var x = 0; x < items.length; x++) { if (items[x].completed) completedItems++; }
+    } catch(e) {}
+
+    var progressPct = totalItems > 0 ? Math.round(completedItems / totalItems * 100) : 0;
+    var overallStatus = "on-track";
+
+    try {
+      var statusItems = await getTrainingItems(tt.id);
+      for (var y = 0; y < statusItems.length; y++) {
+        var s = getStatus(statusItems[y].due_date, statusItems[y].completed);
+        if (s.type === "overdue") { overallStatus = "overdue"; break; }
+        if (s.type === "due-soon") overallStatus = "due-soon";
+      }
+    } catch(e) {}
+    if (completedItems === totalItems && totalItems > 0) overallStatus = "on-track";
+
+    var statusLabel = { "overdue":"有逾期", "due-soon":"即将到期", "on-track":"进度正常" };
+    var statusBadge = { "overdue":"badge-red", "due-soon":"badge-yellow", "on-track":"badge-green" };
+    var progressColor = { "overdue":"progress-red", "due-soon":"progress-yellow", "on-track":"progress-green" };
+    var activeCls = tt.id === currentTraineeId ? " active" : "";
+    var resignedCls = tt.status === "resigned" ? " resigned" : "";
+
+    html += '<div class="trainee-item' + activeCls + resignedCls + '" onclick="selectTrainee(\'' + tt.id + '\')">' +
+      '<div class="trainee-info"><div class="name">' + escHtml(tt.name) + ' · ' + escHtml(tt.position) + '</div>' +
+      '<div class="meta">入职: ' + escHtml(tt.start_date) + ' | 主管: ' + escHtml(tt.supervisor) + '</div>' +
+      '<div class="progress-bar" style="margin-top:6px;width:180px;"><div class="progress-fill ' + progressColor[overallStatus] + '" style="width:' + progressPct + '%"></div></div></div>' +
+      '<div class="trainee-status"><span class="badge ' + statusBadge[overallStatus] + '">' + statusLabel[overallStatus] + '</span>' +
+      '<div class="days">' + completedItems + '/' + totalItems + ' 项完成</div>';
+    if (isAdmin()) {
+      html += '<button class="btn-resign" style="margin-top:4px;" onclick="event.stopPropagation();showResignModal(\'' + tt.id + '\')">' +
+        (tt.status === "resigned" ? "🔄 管理" : "🚪 离职") + '</button>';
+    }
+    html += '</div></div>';
+  }
+
+  container.innerHTML = html;
+
+  // 更新汇总统计
+  updateSummaryFromItems(allDataCache || []);
+}
+
+function switchListTab(tab) {
+  currentListTab = tab;
+  currentTraineeId = null;
+  var trainees = allDataCache || [];
+  renderTraineeList(trainees);
+  renderDetailPlaceholder();
+}
+
+function selectTrainee(id) {
+  currentTraineeId = id;
+  loadTraineeDetail(id);
+}
+
+function renderDetailPlaceholder() {
+  document.getElementById("rightPanel").innerHTML = '<div class="empty-state"><div class="icon">👆</div><p>请从左侧列表选择一名在培人员</p></div>';
+}
+
+// ==================== Trainee Detail ====================
+async function loadTraineeDetail(traineeId) {
+  var container = document.getElementById("rightPanel");
+  try {
+    // 获取培训人员信息
+    var trainees = allDataCache || [];
+    var trainee = null;
+    for (var i = 0; i < trainees.length; i++) {
+      if (trainees[i].id === traineeId) { trainee = trainees[i]; break; }
+    }
+    if (!trainee) { renderDetailPlaceholder(); return; }
+
+    // 获取培训项 + 附件
+    var items = await getTrainingItems(traineeId);
+    currentTraineeItems = items;
+
+    // 获取所有附件
+    var allAttachments = {};
+    for (var a = 0; a < items.length; a++) {
+      try {
+        var atts = await getAttachments(items[a].id);
+        allAttachments[items[a].id] = atts;
+      } catch(e) { allAttachments[items[a].id] = []; }
+    }
+
+    renderTraineeDetail(trainee, items, allAttachments);
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>加载详情失败</p></div>';
+  }
+}
+
+function renderTraineeDetail(trainee, items, allAttachments) {
+  var container = document.getElementById("rightPanel");
+  var totalItems = items.length;
+  var completedItems = 0;
+  for (var x = 0; x < items.length; x++) { if (items[x].completed) completedItems++; }
+  var totalDays = 0;
+  for (var y = 0; y < items.length; y++) { if (items[y].plan_days > totalDays) totalDays = items[y].plan_days; }
+  var lastItem = items[items.length - 1];
+
+  var dueSoonItems = [], overdueItems = [];
+  for (var z = 0; z < items.length; z++) {
+    var s = getStatus(items[z].due_date, items[z].completed);
+    if (s.type === "due-soon") dueSoonItems.push(items[z]);
+    if (s.type === "overdue") overdueItems.push(items[z]);
+  }
+
+  // 格式化到期日显示
+  function fmtDueDate(d) {
+    if (!d) return "";
+    if (d.length === 8) return d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
+    return d;
+  }
+
+  var html = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<div><div class="card-title" style="margin:0;border:none;padding:0;"><span class="icon">📝</span> ' + escHtml(trainee.name) + ' · ' + escHtml(trainee.position) + ' 培训跟踪详情' +
+    (trainee.status === "resigned" ? ' <span class="badge badge-red" style="font-size:13px;padding:3px 10px;">已离职</span>' : '') + '</div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">入职日期: ' + escHtml(trainee.start_date) + ' | 主管: ' + escHtml(trainee.supervisor) + ' | 培训周期: ' + totalDays + ' 天 | 计划完成: ' + escHtml(fmtDueDate(lastItem ? lastItem.due_date : "")) + '</div></div>' +
+    '<span class="badge badge-green" style="font-size:14px;padding:4px 12px;">' + completedItems + '/' + totalItems + ' 完成</span></div></div>';
+
+  if (overdueItems.length > 0 || dueSoonItems.length > 0) {
+    html += '<div class="reminder-panel"><h3>⚠️ 提醒通知 — 主管: ' + escHtml(trainee.supervisor) + '</h3>';
+    for (var d = 0; d < overdueItems.length; d++) {
+      var s = getStatus(overdueItems[d].due_date, overdueItems[d].completed);
+      html += '<div class="reminder-item">🔴 <strong>已逾期 ' + Math.abs(s.diff) + ' 天</strong> — ' + escHtml(overdueItems[d].item_name) + '（到期日: ' + escHtml(fmtDueDate(overdueItems[d].due_date)) + '）</div>';
+    }
+    for (var e = 0; e < dueSoonItems.length; e++) {
+      var s2 = getStatus(dueSoonItems[e].due_date, dueSoonItems[e].completed);
+      html += '<div class="reminder-item">🟡 <strong>仅剩 ' + s2.diff + ' 天</strong> — ' + escHtml(dueSoonItems[e].item_name) + '（到期日: ' + escHtml(fmtDueDate(dueSoonItems[e].due_date)) + '）</div>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div class="card" style="margin-top:16px;"><div class="card-title"><span class="icon">📋</span> 培训项目跟踪表</div>' +
+    '<div class="table-wrap"><table><thead><tr>' +
+    '<th style="width:50px;">序号</th><th>培训内容</th><th style="width:80px;">计划天数</th>' +
+    '<th style="width:110px;">计划到期日</th><th style="width:90px;">状态</th>' +
+    '<th style="width:90px;">剩余天数</th><th style="width:80px;">附件</th><th style="width:80px;">确认完成</th></tr></thead><tbody>';
+
+  for (var r = 0; r < items.length; r++) {
+    var item = items[r];
+    var status = getStatus(item.due_date, item.completed);
+    var rowClass = status.type === "overdue" ? "status-overdue" : (status.type === "due-soon" ? "status-due-soon" : "");
+    var dotClass = status.type === "completed" ? "on-track" : status.cls;
+    var itemAtts = allAttachments[item.id] || [];
+
+    var remainingText = "";
+    if (item.completed) remainingText = "已完成";
+    else if (status.type === "overdue") remainingText = "逾期 " + Math.abs(status.diff) + " 天";
+    else remainingText = "剩余 " + status.diff + " 天";
+
+    html += '<tr class="' + rowClass + '"><td>' + item.seq + '</td><td>' + escHtml(item.item_name) + '</td><td>' + item.plan_days + ' 天</td><td>' + escHtml(fmtDueDate(item.due_date)) + '</td>' +
+      '<td><span class="status-dot ' + dotClass + '"></span><span class="badge ' + status.badge + '">' + status.label + '</span></td>' +
+      '<td>' + remainingText + '</td><td>' + renderAttachmentInCell(itemAtts) + '</td><td>';
+
+    if (!item.completed && trainee.status !== "resigned") {
+      html += '<button class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();openCompletionModal(\'' + trainee.id + '\',' + item.id + ',' + item.seq + ')">上传附件完成</button>';
+    } else if (trainee.status === "resigned" && !item.completed) {
+      html += '<span style="font-size:11px;color:var(--text-secondary);">已离职</span>';
+    } else {
+      html += '<span style="font-size:11px;color:var(--success);">✅ ' + itemAtts.length + '附件</span>';
+    }
+
+    html += '</td></tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  container.innerHTML = html;
+}
+
+function renderAttachmentInCell(attachments) {
+  if (!attachments || attachments.length === 0) return '<span style="color:#ccc;">—</span>';
+  var html = '<div class="attachment-preview">';
+  var limit = Math.min(attachments.length, 3);
+  for (var i = 0; i < limit; i++) {
+    var f = attachments[i];
+    if (f.file_type && f.file_type.indexOf("image/") === 0) {
+      // 尝试通过 Supabase Storage 获取图片 URL
+      var imgUrl = supabase.storage.from("training-attachments").getPublicUrl(f.storage_path).data.publicUrl;
+      html += '<img class="attachment-thumb" src="' + imgUrl + '" onclick="event.stopPropagation();previewAttachment(\'' + imgUrl + '\')" title="' + escHtml(f.file_name) + '">';
+    } else {
+      var fileUrl = supabase.storage.from("training-attachments").getPublicUrl(f.storage_path).data.publicUrl;
+      html += '<a class="attachment-link" href="' + fileUrl + '" download="' + escHtml(f.file_name) + '" onclick="event.stopPropagation();" title="' + escHtml(f.file_name) + '">📄</a>';
+    }
+  }
+  if (attachments.length > 3) {
+    html += '<span style="font-size:11px;color:var(--text-secondary);">+' + (attachments.length - 3) + '</span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function previewAttachment(url) {
+  var lb = document.getElementById("lightbox");
+  lb.innerHTML = '<img src="' + url + '" onclick="closeLightbox()">';
+  lb.style.display = "flex";
+}
+
+function closeLightbox() { document.getElementById("lightbox").style.display = "none"; }
+
+// ==================== 离职管理 ====================
+function showResignModal(traineeId) {
+  var trainees = allDataCache || [];
+  var trainee = null;
+  for (var i = 0; i < trainees.length; i++) { if (trainees[i].id === traineeId) { trainee = trainees[i]; break; } }
+  if (!trainee) return;
+
+  var isResigned = trainee.status === "resigned";
+  var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal" style="width:520px;">' +
+    '<div class="modal-header"><h3>' + (isResigned ? '🔄' : '🚪') + ' ' + (isResigned ? '恢复/删除离职人员' : '离职处理') + '</h3><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+    '<div class="modal-body"><div style="background:#f8f9fa;border-radius:8px;padding:14px 18px;margin-bottom:18px;">' +
+    '<div style="font-size:15px;font-weight:600;margin-bottom:4px;">' + escHtml(trainee.name) + ' · ' + escHtml(trainee.position) + '</div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);">入职日期: ' + escHtml(trainee.start_date) + ' | 主管: ' + escHtml(trainee.supervisor) + '</div></div>';
+
+  if (!isResigned) {
+    html += '<div style="font-size:14px;line-height:2;margin-bottom:16px;">' +
+      '<strong>请选择处理方式：</strong><br>' +
+      '🔖 <strong>标记离职</strong> — 保留培训记录，标记为"已离职"。<br>' +
+      '🗑️ <strong>彻底删除</strong> — 永久删除（不可恢复）。</div></div>' +
+      '<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">取消</button>' +
+      '<button class="btn btn-danger btn-sm" onclick="confirmHardDelete(\'' + traineeId + '\')">🗑️ 彻底删除</button>' +
+      '<button class="btn btn-primary" onclick="confirmResign(\'' + traineeId + '\')">🔖 标记离职</button></div>';
+  } else {
+    html += '<div style="font-size:14px;line-height:2;margin-bottom:16px;">' +
+      '该人员已被标记为离职状态。<br>🔄 <strong>恢复在培</strong> 或 🗑️ <strong>彻底删除</strong></div></div>' +
+      '<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">取消</button>' +
+      '<button class="btn btn-danger btn-sm" onclick="confirmHardDelete(\'' + traineeId + '\')">🗑️ 彻底删除</button>' +
+      '<button class="btn btn-primary" onclick="confirmRestore(\'' + traineeId + '\')">🔄 恢复在培</button></div>';
+  }
+
+  html += '</div></div>';
+  document.getElementById("modalContainer").innerHTML = html;
+}
+
+async function confirmResign(traineeId) {
+  showLoading(true);
+  try {
+    var res = await supabase.from("trainees").update({ status: "resigned", resigned_at: new Date().toISOString() }).eq("id", traineeId);
+    if (res.error) throw res.error;
+    currentTraineeId = null;
+    closeModal();
+    showLoading(false);
+    showToast("已标记为离职状态", "success");
+    renderAll();
+  } catch(e) {
+    showLoading(false);
+    showToast("操作失败：" + e.message, "error");
+  }
+}
+
+async function confirmRestore(traineeId) {
+  showLoading(true);
+  try {
+    var res = await supabase.from("trainees").update({ status: "active", resigned_at: null }).eq("id", traineeId);
+    if (res.error) throw res.error;
+    currentListTab = "active";
+    closeModal();
+    showLoading(false);
+    showToast("已恢复为在培状态", "success");
+    renderAll();
+  } catch(e) {
+    showLoading(false);
+    showToast("操作失败：" + e.message, "error");
+  }
+}
+
+async function confirmHardDelete(traineeId) {
+  if (!confirm("⚠️ 此操作不可恢复！\n\n确定要彻底删除该人员及其所有培训数据吗？")) return;
+  showLoading(true);
+  try {
+    // CASCADE 会自动删除关联的 training_items 和 attachments
+    var res = await supabase.from("trainees").delete().eq("id", traineeId);
+    if (res.error) throw res.error;
+    currentTraineeId = null;
+    closeModal();
+    showLoading(false);
+    showToast("已彻底删除", "success");
+    renderAll();
+  } catch(e) {
+    showLoading(false);
+    showToast("删除失败：" + e.message, "error");
+  }
+}
+
+// ==================== 完成确认 + 附件上传 ====================
+var _pendingFiles = []; // 待上传文件缓存
+
+function openCompletionModal(traineeId, itemId, itemSeq) {
+  var items = currentTraineeItems;
+  var item = null;
+  for (var j = 0; j < items.length; j++) { if (items[j].id === itemId) { item = items[j]; break; } }
+  if (!item || item.completed) return;
+
+  _pendingFiles = [];
+
+  var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal"><div class="modal-header"><h3>✅ 确认完成培训项</h3><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+    '<div class="modal-body">' +
+    '<div style="margin-bottom:14px;"><strong>培训内容：</strong>' + escHtml(item.item_name) + '<br>' +
+    '<span style="font-size:13px;color:var(--text-secondary);">到期日：' + escHtml(fmtDate(item.due_date)) + '</span></div>' +
+    '<div style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">' +
+    '⚠️ <strong>完成确认规则：</strong>请上传能证明此项培训已完成的材料。</div>' +
+    '<label style="font-weight:600;font-size:13px;display:block;margin-bottom:8px;">上传附件（照片/文件，可多选）</label>' +
+    '<div class="upload-area" id="uploadArea" onclick="document.getElementById(\'fileInput\').click()">' +
+    '<div class="icon">📎</div><div class="text">点击上传，或拖拽文件到此处</div>' +
+    '<div class="hint">支持 JPG/PNG/PDF/Word 等格式</div></div>' +
+    '<input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" style="display:none;" onchange="handleFileSelect(event)">' +
+    '<div class="file-list" id="fileList"></div>' +
+    '</div><div class="modal-footer">' +
+    '<button class="btn btn-outline" onclick="closeModal()">取消</button>' +
+    '<button class="btn btn-primary" id="confirmCompleteBtn" onclick="confirmCompletion(\'' + traineeId + '\',' + itemId + ')" disabled>确认完成（已上传 0 个附件）</button></div></div></div>';
+
+  document.getElementById("modalContainer").innerHTML = html;
+  window._currentCompTraineeId = traineeId;
+  window._currentCompItemId = itemId;
+
+  var area = document.getElementById("uploadArea");
+  area.addEventListener("dragover", function(e) { e.preventDefault(); area.classList.add("dragover"); });
+  area.addEventListener("dragleave", function() { area.classList.remove("dragover"); });
+  area.addEventListener("drop", function(e) { e.preventDefault(); area.classList.remove("dragover"); handleFiles(e.dataTransfer.files); });
+}
+
+function handleFileSelect(event) {
+  handleFiles(event.target.files);
+  event.target.value = "";
+}
+
+function handleFiles(files) {
+  for (var i = 0; i < files.length; i++) {
+    _pendingFiles.push(files[i]);
+  }
+  updateFileListUI();
+}
+
+function updateFileListUI() {
+  var html = "";
+  for (var k = 0; k < _pendingFiles.length; k++) {
+    var f = _pendingFiles[k];
+    var isImg = f.type && f.type.indexOf("image/") === 0;
+    html += '<div class="file-item"><div class="file-info">' + (isImg ? "🖼️" : "📄") +
+      '<span>' + escHtml(f.name) + '</span><span style="font-size:11px;color:#999;">(' + (f.size/1024).toFixed(1) + 'KB)</span></div>' +
+      '<button class="file-remove" onclick="removePendingFile(' + k + ')">✕</button></div>';
+  }
+  var fl = document.getElementById("fileList");
+  if (fl) fl.innerHTML = html;
+  var btn = document.getElementById("confirmCompleteBtn");
+  if (btn) {
+    btn.disabled = _pendingFiles.length === 0;
+    btn.textContent = "确认完成（已上传 " + _pendingFiles.length + " 个附件）";
+  }
+}
+
+function removePendingFile(idx) {
+  _pendingFiles.splice(idx, 1);
+  updateFileListUI();
+}
+
+async function confirmCompletion(traineeId, itemId) {
+  if (_pendingFiles.length === 0) { showToast("请先上传附件", "warning"); return; }
+
+  showLoading(true);
+
+  try {
+    // 1. 上传所有文件到 Supabase Storage
+    var uploadResults = [];
+    for (var i = 0; i < _pendingFiles.length; i++) {
+      var file = _pendingFiles[i];
+      var storagePath = traineeId + "/" + itemId + "/" + Date.now() + "_" + file.name;
+
+      var uploadRes = await supabase.storage.from("training-attachments").upload(storagePath, file);
+      if (uploadRes.error) throw uploadRes.error;
+
+      uploadResults.push({
+        item_id: itemId,
+        file_name: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        storage_path: storagePath
+      });
+    }
+
+    // 2. 保存附件元数据
+    if (uploadResults.length > 0) {
+      var attRes = await supabase.from("attachments").insert(uploadResults);
+      if (attRes.error) throw attRes.error;
+    }
+
+    // 3. 标记培训项为完成
+    var updateRes = await supabase.from("training_items").update({
+      completed: true,
+      completed_date: formatDate(new Date())
+    }).eq("id", itemId);
+    if (updateRes.error) throw updateRes.error;
+
+    _pendingFiles = [];
+    closeModal();
+    showLoading(false);
+    showToast("已完成，共 " + uploadResults.length + " 个附件已上传", "success");
+    renderAll();
+  } catch(e) {
+    showLoading(false);
+    showToast("操作失败：" + e.message, "error");
+  }
+}
+
+function fmtDate(d) {
+  if (!d) return "";
+  if (d.length === 8) return d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
+  return d;
+}
+
+// ==================== 账号管理（Admin）====================
+async function showAccountManager() {
+  if (!isAdmin()) { showToast("仅管理员可操作", "warning"); return; }
+  showLoading(true);
+
+  try {
+    var res = await supabase.from("accounts").select("*").order("created_at", { ascending: true });
+    var accounts = res.data || [];
+    var supervisors = accounts.filter(function(a) { return a.role === "supervisor"; });
+    showLoading(false);
+
+    var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal" style="width:600px;">' +
+      '<div class="modal-header"><h3>👤 账号管理</h3><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+      '<div class="modal-body">' +
+      '<div class="card-title" style="margin:0 0 16px 0;padding:0;border:none;">添加主管账号</div>' +
+      '<div class="form-row">' +
+      '<div class="form-group" style="margin-bottom:14px;"><label>主管姓名</label><input type="text" id="newSupName" placeholder="如：张三"></div>' +
+      '<div class="form-group" style="margin-bottom:14px;"><label>登录用户名</label><input type="text" id="newSupUser" placeholder="如：zhangsan"></div></div>' +
+      '<div class="form-row">' +
+      '<div class="form-group" style="margin-bottom:14px;"><label>登录密码</label><input type="password" id="newSupPass" placeholder="设置密码"></div>' +
+      '<div class="form-group" style="margin-bottom:14px;"><label>&nbsp;</label><button class="btn btn-primary" onclick="addSupervisor()" style="margin-top:26px;">➕ 添加主管账号</button></div></div>' +
+      '<hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">' +
+      '<div class="card-title" style="margin:0 0 12px 0;padding:0;border:none;">已有主管账号（' + supervisors.length + '人）</div>';
+
+    if (supervisors.length === 0) {
+      html += '<div style="font-size:13px;color:var(--text-secondary);padding:12px 0;">暂无主管账号</div>';
+    } else {
+      for (var j = 0; j < supervisors.length; j++) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f3f4;">' +
+          '<div><strong>' + escHtml(supervisors[j].name) + '</strong><span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">登录名：' + escHtml(supervisors[j].username) + '</span></div>' +
+          '<button class="btn btn-danger btn-sm" onclick="deleteAccount(\'' + supervisors[j].id + '\')">删除</button></div>';
+      }
+    }
+
+    html += '</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">关闭</button></div></div></div>';
+    document.getElementById("modalContainer").innerHTML = html;
+  } catch(e) {
+    showLoading(false);
+    showToast("加载失败：" + e.message, "error");
+  }
+}
+
+async function addSupervisor() {
+  var name = document.getElementById("newSupName").value.trim();
+  var username = document.getElementById("newSupUser").value.trim();
+  var password = document.getElementById("newSupPass").value;
+
+  if (!name || !username || !password) { showToast("请填写完整信息", "warning"); return; }
+
+  showLoading(true);
+  try {
+    // 检查用户名
+    var check = await supabase.from("accounts").select("id").eq("username", username).single();
+    if (check.data) {
+      showLoading(false);
+      showToast("用户名已存在，请更换", "warning");
+      return;
+    }
+
+    var res = await supabase.from("accounts").insert({
+      username: username, password: password, name: name, role: "supervisor"
+    });
+    if (res.error) throw res.error;
+
+    showLoading(false);
+    showToast("主管账号「" + name + "」创建成功", "success");
+    closeModal();
+    showAccountManager();
+  } catch(e) {
+    showLoading(false);
+    showToast("创建失败：" + e.message, "error");
+  }
+}
+
+async function deleteAccount(id) {
+  if (!confirm("确定要删除该账号吗？")) return;
+  showLoading(true);
+  try {
+    var res = await supabase.from("accounts").delete().eq("id", id);
+    if (res.error) throw res.error;
+    showLoading(false);
+    showToast("账号已删除", "success");
+    closeModal();
+    showAccountManager();
+  } catch(e) {
+    showLoading(false);
+    showToast("删除失败：" + e.message, "error");
+  }
+}
+
+async function showDataStats() {
+  if (!isAdmin()) { showToast("仅管理员可查看", "warning"); return; }
+  showLoading(true);
+  try {
+    var traineesRes = await supabase.from("trainees").select("*");
+    var accountsRes = await supabase.from("accounts").select("*").eq("role", "supervisor");
+    showLoading(false);
+
+    var all = traineesRes.data || [];
+    var supervisors = accountsRes.data || [];
+    var statsHtml = "";
+    for (var j = 0; j < supervisors.length; j++) {
+      var cnt = 0;
+      for (var k = 0; k < all.length; k++) { if (all[k].supervisor === supervisors[j].name) cnt++; }
+      statsHtml += '<div style="padding:6px 0;">' + escHtml(supervisors[j].name) + '：负责 ' + cnt + ' 名新人</div>';
+    }
+
+    var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal" style="width:500px;">' +
+      '<div class="modal-header"><h3>📊 数据统计</h3><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+      '<div class="modal-body" style="font-size:14px;line-height:2;">' +
+      '<p><strong>总在培人数：</strong>' + all.filter(function(t){return t.status!=="resigned"}).length + ' 人</p>' +
+      '<p><strong>主管账号数：</strong>' + supervisors.length + ' 人</p>' +
+      '<hr style="margin:12px 0;border:none;border-top:1px solid var(--border);">' +
+      '<strong>各主管负责人数：</strong><br>' + (statsHtml || "暂无主管账号") +
+      '</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">关闭</button></div></div></div>';
+
+    document.getElementById("modalContainer").innerHTML = html;
+  } catch(e) {
+    showLoading(false);
+    showToast("加载失败", "error");
+  }
+}
+
+// ==================== 飞书配置 ====================
+async function showFeishuConfig() {
+  if (!isAdmin()) { showToast("仅管理员可配置", "warning"); return; }
+  showLoading(true);
+
+  try {
+    var accountsRes = await supabase.from("accounts").select("*").eq("role", "supervisor").order("created_at");
+    var cfgRes = await supabase.from("feishu_config").select("*");
+    showLoading(false);
+
+    var supervisors = accountsRes.data || [];
+    var cfgRows = cfgRes.data || [];
+    var cfg = {};
+    for (var i = 0; i < cfgRows.length; i++) {
+      cfg[cfgRows[i].config_key] = cfgRows[i].config_value;
+    }
+
+    var adminCfg = cfg.admin_channel || { url: "", enabled: true };
+    var supervisorsCfg = cfg.supervisors || {};
+
+    var html = '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal" style="width:650px;">' +
+      '<div class="modal-header"><h3>飞书机器人Webhook配置</h3><button class="modal-close" onclick="closeModal()">✕</button></div>' +
+      '<div class="modal-body">' +
+      '<div style="background:#fffcf0;border:1px solid #f9ab00;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;line-height:1.8;">' +
+      '<strong>使用说明：</strong><br>1. 在飞书群中添加<strong>自定义机器人</strong>，复制Webhook地址<br>' +
+      '2. 为每位主管配置对应群的Webhook</div>' +
+      '<div style="margin-bottom:20px;"><h4 style="margin-bottom:10px;">管理员通知渠道</h4>' +
+      '<div class="form-group"><label>Webhook URL</label>' +
+      '<input type="text" id="cfgAdminUrl" value="' + escHtml(adminCfg.url || '') + '" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."></div></div>';
+
+    for (var j = 0; j < supervisors.length; j++) {
+      var sup = supervisors[j];
+      var supCfg = supervisorsCfg[sup.name] || { url: "", enabled: true };
+      html += '<div style="background:#f8f9fa;border-radius:8px;padding:12px 16px;margin-bottom:10px;">' +
+        '<div style="font-weight:600;margin-bottom:8px;">' + escHtml(sup.name) + '</div>' +
+        '<div class="form-group"><input type="text" id="cfgSupUrl_' + j + '" data-name="' + escHtml(sup.name) + '" value="' + escHtml(supCfg.url || '') + '" placeholder="Webhook URL"></div></div>';
+    }
+
+    html += '</div><div class="modal-footer">' +
+      '<button class="btn btn-outline" onclick="closeModal()">取消</button>' +
+      '<button class="btn btn-primary" onclick="saveFeishuConfig()">保存配置</button></div></div></div>';
+
+    document.getElementById("modalContainer").innerHTML = html;
+  } catch(e) {
+    showLoading(false);
+    showToast("加载失败", "error");
+  }
+}
+
+async function saveFeishuConfig() {
+  showLoading(true);
+  try {
+    var adminUrl = document.getElementById("cfgAdminUrl").value.trim();
+    // Upsert admin config
+    await supabase.from("feishu_config").upsert({
+      config_key: "admin_channel",
+      config_value: { url: adminUrl, enabled: true }
+    }, { onConflict: "config_key" });
+
+    // Collect supervisor configs
+    var supInputs = document.querySelectorAll("[id^='cfgSupUrl_']");
+    var supervisorsCfg = {};
+    for (var i = 0; i < supInputs.length; i++) {
+      var el = supInputs[i];
+      var name = el.getAttribute("data-name");
+      var url = el.value.trim();
+      if (name && url) {
+        supervisorsCfg[name] = { url: url, enabled: true };
+      }
+    }
+
+    await supabase.from("feishu_config").upsert({
+      config_key: "supervisors",
+      config_value: supervisorsCfg
+    }, { onConflict: "config_key" });
+
+    showLoading(false);
+    closeModal();
+    showToast("飞书配置已保存", "success");
+  } catch(e) {
+    showLoading(false);
+    showToast("保存失败：" + e.message, "error");
+  }
+}
+
+// ==================== 飞书推送 ====================
+function pushNewTraineeNotification(name, position, startDate, supervisor) {
+  getFeishuConfigFromDB().then(function(cfg) {
+    var message = "📋 新人培训跟踪系统通知\n\n【新人入职】\n姓名：" + name + "\n岗位：" + position + "\n入职日期：" + startDate + "\n负责主管：" + supervisor + "\n\n已自动生成培训跟踪计划。\n— 飞鹤乳业克东分公司 · 生产部制粉部门";
+    var targetUrl = null;
+
+    if (cfg.supervisors && cfg.supervisors[supervisor] && cfg.supervisors[supervisor].url && cfg.supervisors[supervisor].url.indexOf("https://") === 0) {
+      targetUrl = cfg.supervisors[supervisor].url;
+    } else if (cfg.admin_channel && cfg.admin_channel.url && cfg.admin_channel.url.indexOf("https://") === 0) {
+      targetUrl = cfg.admin_channel.url;
+    }
+
+    if (targetUrl) {
+      pushToWebhook(targetUrl, { msg_type: "text", content: { text: message } });
+    }
+  });
+}
+
+async function getFeishuConfigFromDB() {
+  try {
+    var res = await supabase.from("feishu_config").select("*");
+    var cfg = {};
+    var rows = res.data || [];
+    for (var i = 0; i < rows.length; i++) {
+      cfg[rows[i].config_key] = rows[i].config_value;
+    }
+    return cfg;
+  } catch(e) { return {}; }
+}
+
+function pushToWebhook(url, payload) {
+  try {
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(function(e) { console.error("飞书推送失败:", e); });
+  } catch(e) { console.error("飞书推送失败:", e); }
+}
+
+async function pushReminder() {
+  if (!isAdmin()) { showToast("仅管理员可推送", "warning"); return; }
+  showLoading(true);
+
+  try {
+    var trainees = allDataCache || [];
+    var cfg = await getFeishuConfigFromDB();
+    showLoading(false);
+
+    // 计算需提醒的数据（简化版 - 在前端获取每个 trainee 的 items）
+    var supNames = [];
+    var alertData = {};
+
+    for (var i = 0; i < trainees.length; i++) {
+      if (trainees[i].status === "resigned") continue;
+      var items = currentTraineeItems; // 简化：使用当前选中人员的 items
+
+      // 遍历所有人员查找需要提醒的
+      // 实际应用中需要更完善的逻辑
+      var sup = trainees[i].supervisor || "未分配";
+      if (!alertData[sup]) alertData[sup] = { count: 0, names: [] };
+      alertData[sup].count++;
+      alertData[sup].names.push(trainees[i].name);
+    }
+
+    // 执行推送
+    var totalSent = 0;
+    var keys = Object.keys(alertData);
+    for (var k = 0; k < keys.length; k++) {
+      var sup = keys[k];
+      var data = alertData[sup];
+      var targetUrl = null;
+
+      if (cfg.supervisors && cfg.supervisors[sup] && cfg.supervisors[sup].url && cfg.supervisors[sup].url.indexOf("https://") === 0) {
+        targetUrl = cfg.supervisors[sup].url;
+      } else if (cfg.admin_channel && cfg.admin_channel.url && cfg.admin_channel.url.indexOf("https://") === 0) {
+        targetUrl = cfg.admin_channel.url;
+      }
+
+      if (targetUrl) {
+        var msg = sup + " 主管，您好！\n\n您负责 " + data.count + " 名新人的培训跟踪。\n人员：" + data.names.join("、") + "\n\n请及时登录系统查看详情。\n— 飞鹤乳业克东分公司";
+        pushToWebhook(targetUrl, { msg_type: "text", content: { text: msg } });
+        totalSent++;
+      }
+    }
+
+    showToast("推送完成：已发送 " + totalSent + " 条通知", totalSent > 0 ? "success" : "warning");
+  } catch(e) {
+    showLoading(false);
+    showToast("推送失败：" + e.message, "error");
+  }
+}
+
+// ==================== 导出 CSV ====================
+async function exportCSV() {
+  if (!isAdmin()) { showToast("仅管理员可导出", "warning"); return; }
+  showLoading(true);
+
+  try {
+    var trainees = allDataCache || [];
+    if (trainees.length === 0) { showLoading(false); showToast("暂无数据", "warning"); return; }
+
+    var BOM = "\uFEFF";
+    var header = "新人姓名,岗位,入职日期,主管,在培状态,序号,培训内容,计划天数,计划到期日,完成状态,剩余天数\n";
+    var csv = BOM + header;
+
+    for (var t = 0; t < trainees.length; t++) {
+      var items = await getTrainingItems(trainees[t].id);
+      for (var x = 0; x < items.length; x++) {
+        var item = items[x];
+        var status = getStatus(item.due_date, item.completed);
+        var remaining = item.completed ? "已完成" : (status.type === "overdue" ? "逾期" + Math.abs(status.diff) + "天" : "剩余" + status.diff + "天");
+        csv += [trainees[t].name, trainees[t].position, trainees[t].start_date, trainees[t].supervisor,
+          trainees[t].status === "resigned" ? "已离职" : "在培",
+          item.seq, '"' + item.item_name + '"', item.plan_days, fmtDate(item.due_date),
+          item.completed ? "已完成" : "未完成", remaining].join(",") + "\n";
+      }
+    }
+
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "新人培训跟踪_" + formatDate(new Date()) + ".csv";
+    a.click(); URL.revokeObjectURL(url);
+    showLoading(false);
+    showToast("CSV导出成功", "success");
+  } catch(e) {
+    showLoading(false);
+    showToast("导出失败：" + e.message, "error");
+  }
+}
+
+// ==================== 导出 JSON ====================
+async function exportJSON() {
+  if (!isAdmin()) { showToast("仅管理员可导出", "warning"); return; }
+  showLoading(true);
+
+  try {
+    var trainees = allDataCache || [];
+    if (trainees.length === 0) { showLoading(false); showToast("暂无数据", "warning"); return; }
+
+    var exportData = [];
+    for (var t = 0; t < trainees.length; t++) {
+      exportData.push({
+        id: trainees[t].id, name: trainees[t].name, position: trainees[t].position,
+        start_date: trainees[t].start_date, supervisor: trainees[t].supervisor,
+        status: trainees[t].status, created_at: trainees[t].created_at
+      });
+    }
+
+    var json = JSON.stringify(exportData, null, 2);
+    var blob = new Blob([json], { type: "application/json;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "新人培训数据.json";
+    a.click(); URL.revokeObjectURL(url);
+    showLoading(false);
+    showToast("JSON导出成功", "success");
+  } catch(e) {
+    showLoading(false);
+    showToast("导出失败：" + e.message, "error");
+  }
+}
+</script>
+</body>
+</html>
