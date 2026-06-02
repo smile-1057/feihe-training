@@ -763,7 +763,7 @@ function formatDate(date) {
   var y = date.getFullYear();
   var m = String(date.getMonth() + 1).padStart(2, "0");
   var d = String(date.getDate()).padStart(2, "0");
-  return y + m + d;
+  return y + "-" + m + "-" + d;
 }
 
 function formatDateDisplay(date) {
@@ -873,6 +873,7 @@ function getAttachments(itemId) {
 var currentTraineeId = null;
 var currentListTab = "active";
 var currentTraineeItems = [];
+var searchKeyword = "";
 
 function initApp() {
   var user = currentUser;
@@ -946,7 +947,9 @@ async function renderAddForm() {
     '<div class="status-tabs" id="statusTabs">' +
     '<button class="status-tab active" onclick="switchListTab(\'active\')">在　培<span class="count" id="activeCount"></span></button>' +
     '<button class="status-tab" onclick="switchListTab(\'resigned\')">已离职<span class="count" id="resignedCount"></span></button>' +
-    '</div><div class="trainee-list" id="traineeList"></div></div>';
+    '</div>' +
+    '<div style="margin-bottom:10px;"><input type="text" id="searchTrainee" placeholder="🔍 搜索姓名/岗位/主管..." style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;" oninput="filterTraineeList()"></div>' +
+    '<div class="trainee-list" id="traineeList"></div></div>';
 
   var btnHtml = '<div class="btn-bar">' +
     '<button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 导出CSV</button>' +
@@ -980,6 +983,14 @@ async function addTrainee() {
   var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
   try {
+    // 0. 查重：检查是否已存在同名在培新人
+    var dupCheck = await supabase.from("trainees").select("id,name,position,start_date").eq("name", name).eq("status", "active");
+    if (dupCheck.data && dupCheck.data.length > 0) {
+      var dup = dupCheck.data[0];
+      showLoading(false);
+      if (!confirm("⚠️ 发现同名在培新人！\n\n姓名：" + dup.name + "\n岗位：" + dup.position + "\n入职日期：" + dup.start_date + "\n\n是否仍要添加？")) return;
+    }
+
     // 1. 插入 trainees
     var traineeRes = await supabase.from("trainees").insert({
       id: id, name: name, position: position, start_date: startDate,
@@ -992,14 +1003,18 @@ async function addTrainee() {
     var planItems = generatePlan(position, startDate);
     var insertRows = planItems.map(function(item) {
       return {
-        trainee_id: id, seq: item.seq, item_name: item.item,
+        trainee_id: id, seq: item.seq, item_name: item.item_name,
         plan_days: item.plan_days, due_date: item.due_date,
         completed: false
       };
     });
 
     var itemsRes = await supabase.from("training_items").insert(insertRows);
-    if (itemsRes.error) throw itemsRes.error;
+    if (itemsRes.error) {
+      console.error("training_items insert error:", itemsRes.error);
+      console.error("Sample row:", JSON.stringify(insertRows[0], null, 2));
+      throw new Error("培训项插入失败：" + (itemsRes.error.message || itemsRes.error.details || JSON.stringify(itemsRes.error)));
+    }
 
     showLoading(false);
     currentTraineeId = id;
@@ -1017,7 +1032,8 @@ async function addTrainee() {
     renderAll();
   } catch(e) {
     showLoading(false);
-    showToast("添加失败：" + (e.message || "未知错误"), "error");
+    console.error("addTrainee catch:", e);
+    showToast("添加失败：" + (e.message || e.details || "未知错误"), "error");
   }
 }
 
@@ -1085,41 +1101,86 @@ function renderTraineeList(trainees) {
   else if (tabs.length >= 1) tabs[0].classList.add("active");
 
   var displayList = currentListTab === "resigned" ? resignedList : activeList;
+
+  // 搜索过滤
+  if (searchKeyword) {
+    displayList = displayList.filter(function(t) {
+      return (t.name && t.name.toLowerCase().indexOf(searchKeyword) !== -1) ||
+             (t.position && t.position.toLowerCase().indexOf(searchKeyword) !== -1) ||
+             (t.supervisor && t.supervisor.toLowerCase().indexOf(searchKeyword) !== -1);
+    });
+  }
+
   if (displayList.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>' + (currentListTab === "resigned" ? "暂无已离职人员" : "暂无在培人员") + '</p></div>';
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>' + (searchKeyword ? "未找到匹配的人员" : (currentListTab === "resigned" ? "暂无已离职人员" : "暂无在培人员")) + '</p></div>';
     return;
   }
 
-  // 需要加载每个人员的完成进度来显示
-  renderTraineeListWithProgress(container, displayList);
+  // 搜索中时使用轻量渲染（不查API），否则加载进度
+  if (searchKeyword) {
+    renderTraineeListSimple(container, displayList);
+  } else {
+    renderTraineeListWithProgress(container, displayList);
+  }
+}
+
+// 轻量渲染（搜索时使用，不查API）
+function renderTraineeListSimple(container, displayList) {
+  var html = "";
+  for (var t = 0; t < displayList.length; t++) {
+    var tt = displayList[t];
+    var activeCls = tt.id === currentTraineeId ? " active" : "";
+    var resignedCls = tt.status === "resigned" ? " resigned" : "";
+
+    html += '<div class="trainee-item' + activeCls + resignedCls + '" onclick="selectTrainee(\'' + tt.id + '\');document.getElementById(\'searchTrainee\').value=\'\';searchKeyword=\'\';">' +
+      '<div class="trainee-info"><div class="name">' + escHtml(tt.name) + ' · ' + escHtml(tt.position) + '</div>' +
+      '<div class="meta">入职: ' + escHtml(tt.start_date) + ' | 主管: ' + escHtml(tt.supervisor) + '</div></div>' +
+      '<div class="trainee-status">';
+    if (isAdmin()) {
+      html += '<button class="btn-resign" onclick="event.stopPropagation();showResignModal(\'' + tt.id + '\')">' +
+        (tt.status === "resigned" ? "🔄 管理" : "🚪 离职") + '</button>';
+    }
+    html += '</div></div>';
+  }
+  container.innerHTML = html;
 }
 
 async function renderTraineeListWithProgress(container, displayList) {
   var html = "";
+  // 汇总统计
+  var totalOnTrack = 0, totalDueSoon = 0, totalOverdue = 0;
+  var trainees4sum = (allDataCache || []).filter(function(t) { return t.status !== "resigned"; });
 
   for (var t = 0; t < displayList.length; t++) {
     var tt = displayList[t];
     var totalItems = 0, completedItems = 0;
+    var overallStatus = "on-track";
 
     try {
       var items = await getTrainingItems(tt.id);
       totalItems = items.length;
-      for (var x = 0; x < items.length; x++) { if (items[x].completed) completedItems++; }
-    } catch(e) {}
-
-    var progressPct = totalItems > 0 ? Math.round(completedItems / totalItems * 100) : 0;
-    var overallStatus = "on-track";
-
-    try {
-      var statusItems = await getTrainingItems(tt.id);
-      for (var y = 0; y < statusItems.length; y++) {
-        var s = getStatus(statusItems[y].due_date, statusItems[y].completed);
+      for (var x = 0; x < items.length; x++) {
+        if (items[x].completed) completedItems++;
+      }
+      // 同时判断状态（一次查询搞定）
+      for (var y = 0; y < items.length; y++) {
+        var s = getStatus(items[y].due_date, items[y].completed);
         if (s.type === "overdue") { overallStatus = "overdue"; break; }
         if (s.type === "due-soon") overallStatus = "due-soon";
       }
-    } catch(e) {}
-    if (completedItems === totalItems && totalItems > 0) overallStatus = "on-track";
+      if (completedItems === totalItems && totalItems > 0) overallStatus = "on-track";
 
+      // 累计汇总（仅非离职人员）
+      if (tt.status !== "resigned") {
+        if (overallStatus === "overdue") totalOverdue++;
+        else if (overallStatus === "due-soon") totalDueSoon++;
+        else totalOnTrack++;
+      }
+    } catch(e) {
+      if (tt.status !== "resigned") totalOnTrack++;
+    }
+
+    var progressPct = totalItems > 0 ? Math.round(completedItems / totalItems * 100) : 0;
     var statusLabel = { "overdue":"有逾期", "due-soon":"即将到期", "on-track":"进度正常" };
     var statusBadge = { "overdue":"badge-red", "due-soon":"badge-yellow", "on-track":"badge-green" };
     var progressColor = { "overdue":"progress-red", "due-soon":"progress-yellow", "on-track":"progress-green" };
@@ -1141,8 +1202,19 @@ async function renderTraineeListWithProgress(container, displayList) {
 
   container.innerHTML = html;
 
-  // 更新汇总统计
-  updateSummaryFromItems(allDataCache || []);
+  // 直接用已计算的汇总更新顶部卡片（无需再次查询）
+  document.getElementById("summaryRow").innerHTML =
+    '<div class="summary-card"><div class="num blue">' + trainees4sum.length + '</div><div class="label">在培新人</div></div>' +
+    '<div class="summary-card"><div class="num green">' + totalOnTrack + '</div><div class="label">进度正常</div></div>' +
+    '<div class="summary-card"><div class="num orange">' + totalDueSoon + '</div><div class="label">即将到期(7天)</div></div>' +
+    '<div class="summary-card"><div class="num red">' + totalOverdue + '</div><div class="label">已逾期</div></div>';
+}
+
+function filterTraineeList() {
+  var el = document.getElementById("searchTrainee");
+  if (el) searchKeyword = el.value.trim().toLowerCase();
+  var trainees = allDataCache || [];
+  renderTraineeList(trainees);
 }
 
 function switchListTab(tab) {
@@ -1772,23 +1844,40 @@ async function pushReminder() {
   try {
     var trainees = allDataCache || [];
     var cfg = await getFeishuConfigFromDB();
-    showLoading(false);
 
-    // 计算需提醒的数据（简化版 - 在前端获取每个 trainee 的 items）
-    var supNames = [];
+    // 遍历所有在培人员，逐人获取培训项
     var alertData = {};
 
     for (var i = 0; i < trainees.length; i++) {
       if (trainees[i].status === "resigned") continue;
-      var items = currentTraineeItems; // 简化：使用当前选中人员的 items
 
-      // 遍历所有人员查找需要提醒的
-      // 实际应用中需要更完善的逻辑
       var sup = trainees[i].supervisor || "未分配";
-      if (!alertData[sup]) alertData[sup] = { count: 0, names: [] };
+      if (!alertData[sup]) alertData[sup] = { count: 0, names: [], overdueNames: [], dueSoonNames: [] };
+
       alertData[sup].count++;
       alertData[sup].names.push(trainees[i].name);
+
+      try {
+        var items = await getTrainingItems(trainees[i].id);
+        for (var x = 0; x < items.length; x++) {
+          if (items[x].completed) continue;
+          var s = getStatus(items[x].due_date, items[x].completed);
+          if (s.type === "overdue") {
+            if (alertData[sup].overdueNames.indexOf(trainees[i].name) === -1) {
+              alertData[sup].overdueNames.push(trainees[i].name);
+            }
+            break;
+          }
+          if (s.type === "due-soon") {
+            if (alertData[sup].dueSoonNames.indexOf(trainees[i].name) === -1) {
+              alertData[sup].dueSoonNames.push(trainees[i].name);
+            }
+          }
+        }
+      } catch(e) {}
     }
+
+    showLoading(false);
 
     // 执行推送
     var totalSent = 0;
@@ -1805,7 +1894,23 @@ async function pushReminder() {
       }
 
       if (targetUrl) {
-        var msg = sup + " 主管，您好！\n\n您负责 " + data.count + " 名新人的培训跟踪。\n人员：" + data.names.join("、") + "\n\n请及时登录系统查看详情。\n— 飞鹤乳业克东分公司";
+        var detailParts = [];
+        if (data.overdueNames.length > 0) detailParts.push("🔴 有逾期：" + data.overdueNames.join("、"));
+        if (data.dueSoonNames.length > 0) detailParts.push("🟡 即将到期：" + data.dueSoonNames.join("、"));
+        var detailStr = detailParts.length > 0 ? "\n" + detailParts.join("\n") : "";
+
+        var msg = sup + " 主管，您好！\n\n您负责 " + data.count + " 名新人：" + data.names.join("、") + detailStr + "\n\n请及时登录系统查看详情。\n— 飞鹤乳业克东分公司";
+        pushToWebhook(targetUrl, { msg_type: "text", content: { text: msg } });
+        totalSent++;
+      }
+    }
+
+    showToast("推送完成：已发送 " + totalSent + " 条通知", totalSent > 0 ? "success" : "warning");
+  } catch(e) {
+    showLoading(false);
+    showToast("推送失败：" + e.message, "error");
+  }
+}
         pushToWebhook(targetUrl, { msg_type: "text", content: { text: msg } });
         totalSent++;
       }
